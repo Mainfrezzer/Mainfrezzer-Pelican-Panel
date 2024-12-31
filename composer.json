@@ -1,0 +1,95 @@
+{
+    "name": "pelican-dev/panel",
+    "description": "The free, open-source game management panel. Supporting Minecraft, Spigot, BungeeCord, and SRCDS servers.",
+    "require": {
+        "php": "^8.2 || ^8.3",
+        "ext-intl": "*",
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "ext-pdo": "*",
+        "ext-zip": "*",
+        "abdelhamiderrahmouni/filament-monaco-editor": "^0.2.5",
+        "aws/aws-sdk-php": "~3.288.1",
+        "calebporzio/sushi": "^2.5",
+        "chillerlan/php-qrcode": "^5.0.2",
+        "coderflex/filament-turnstile": "^2.2",
+        "dedoc/scramble": "^0.10.0",
+        "doctrine/dbal": "~3.6.0",
+        "filament/filament": "^3.2",
+        "guzzlehttp/guzzle": "^7.8.1",
+        "laravel/framework": "^11.7",
+        "laravel/helpers": "^1.7",
+        "laravel/sanctum": "^4.0.2",
+        "laravel/socialite": "^5.14",
+        "laravel/tinker": "^2.9",
+        "laravel/ui": "^4.5.1",
+        "lcobucci/jwt": "~4.3.0",
+        "league/flysystem-aws-s3-v3": "~3.12.2",
+        "league/flysystem-memory": "~3.10.3",
+        "phpseclib/phpseclib": "~3.0.18",
+        "pragmarx/google2fa": "~8.0.0",
+        "predis/predis": "~2.1.1",
+        "ryangjchandler/blade-tabler-icons": "^2.3",
+        "s1lentium/iptools": "~1.2.0",
+        "socialiteproviders/authentik": "^5.2",
+        "socialiteproviders/discord": "^4.2",
+        "socialiteproviders/steam": "^4.2",
+        "spatie/laravel-fractal": "^6.2",
+        "spatie/laravel-permission": "^6.9",
+        "spatie/laravel-query-builder": "^5.8.1",
+        "spatie/temporary-directory": "^2.2",
+        "symfony/http-client": "^7.1",
+        "symfony/mailgun-mailer": "^7.1",
+        "symfony/postmark-mailer": "^7.0.7",
+        "symfony/yaml": "^7.0.7",
+        "webbingbrasil/filament-copyactions": "^3.0.1",
+        "webmozart/assert": "~1.11.0"
+    },
+    "require-dev": {
+        "barryvdh/laravel-ide-helper": "^3.0",
+        "fakerphp/faker": "^1.23.1",
+        "larastan/larastan": "^2.9.6",
+        "laravel/pint": "^1.15.3",
+        "laravel/sail": "^1.29.1",
+        "mockery/mockery": "^1.6.11",
+        "nunomaduro/collision": "^8.1.1",
+        "phpunit/phpunit": "^10.5.20",
+        "spatie/laravel-ignition": "^2.7"
+    },
+    "autoload": {
+        "files": [
+            "app/helpers.php"
+        ],
+        "psr-4": {
+            "App\\": "app/",
+            "Database\\Factories\\": "database/Factories/",
+            "Database\\Seeders\\": "database/Seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "App\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "cs:fix": "php-cs-fixer fix",
+        "cs:check": "php-cs-fixer fix --dry-run --diff --verbose",
+        "phpstan": "phpstan --memory-limit=-1",
+        "post-autoload-dump": [
+            "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump"
+        ],
+        "post-root-package-install": [
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
+        ],
+        "post-create-project-cmd": [
+            "@php artisan key:generate --ansi"
+        ]
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

@@ -1,0 +1,17 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+rules:
+    - App\PHPStan\ForbiddenGlobalFunctionsRule
+
+parameters:
+
+    paths:
+        - app
+
+    level: 6
+
+    ignoreErrors:
+        - '#no value type specified in iterable#'
+        - '#Unable to resolve the template type#'
+        - '#does not specify its types#'
