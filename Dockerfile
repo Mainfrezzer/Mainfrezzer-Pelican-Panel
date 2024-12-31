@@ -54,7 +54,6 @@ HEALTHCHECK --interval=5m --timeout=10s --start-period=5s --retries=3 \
 EXPOSE 80 443
 
 VOLUME /pelican-data
-# Tmp Fix
-#RUN sed -ie 's|^        abort_unless(request()->hasValidSignature(), 401);|        #abort_unless(request()->hasValidSignature(), 401);|g' /var/www/html/vendor/livewire/livewire/src/Features/SupportFileUploads/FileUploadController.php
+
 ENTRYPOINT [ "/bin/ash", ".github/docker/entrypoint.sh" ]
 CMD [ "supervisord", "-n", "-c", "/etc/supervisord.conf" ]
