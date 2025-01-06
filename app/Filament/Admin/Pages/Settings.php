@@ -26,9 +26,9 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Concerns\InteractsWithHeaderActions;
 use Filament\Pages\Page;
 use Filament\Support\Enums\MaxWidth;
-use GuzzleHttp\Client;
-use GuzzleHttp\Exception\GuzzleException;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Notification as MailNotification;
 use Illuminate\Support\HtmlString;
 
@@ -84,6 +84,10 @@ class Settings extends Page implements HasForms
                         ->label('Backup')
                         ->icon('tabler-box')
                         ->schema($this->backupSettings()),
+                    Tab::make('OAuth')
+                        ->label('OAuth')
+                        ->icon('tabler-brand-oauth')
+                        ->schema($this->oauthSettings()),
                     Tab::make('misc')
                         ->label('Misc')
                         ->icon('tabler-tool')
@@ -164,22 +168,23 @@ class Settings extends Page implements HasForms
                         ->label('Set to Cloudflare IPs')
                         ->icon('tabler-brand-cloudflare')
                         ->authorize(fn () => auth()->user()->can('update settings'))
-                        ->action(function (Client $client, Set $set) {
+                        ->action(function (Factory $client, Set $set) {
                             $ips = collect();
+
                             try {
-                                $response = $client->request(
-                                    'GET',
-                                    'https://api.cloudflare.com/client/v4/ips',
-                                    config('panel.guzzle')
-                                );
+                                $response = $client
+                                    ->timeout(3)
+                                    ->connectTimeout(3)
+                                    ->get('https://api.cloudflare.com/client/v4/ips');
+
                                 if ($response->getStatusCode() === 200) {
-                                    $result = json_decode($response->getBody(), true)['result'];
+                                    $result = $response->json('result');
                                     foreach (['ipv4_cidrs', 'ipv6_cidrs'] as $value) {
                                         $ips->push(...data_get($result, $value));
                                     }
                                     $ips->unique();
                                 }
-                            } catch (GuzzleException $e) {
+                            } catch (Exception) {
                             }
 
                             $set('TRUSTED_PROXIES', $ips->values()->all());
@@ -245,12 +250,12 @@ class Settings extends Page implements HasForms
                 ->columnSpanFull()
                 ->inline()
                 ->options([
-                    'log' => 'Print mails to Log',
+                    'log' => '/storage/logs Directory',
                     'smtp' => 'SMTP Server',
-                    'sendmail' => 'sendmail Binary',
                     'mailgun' => 'Mailgun',
                     'mandrill' => 'Mandrill',
                     'postmark' => 'Postmark',
+                    'sendmail' => 'sendmail (PHP)',
                 ])
                 ->live()
                 ->default(env('MAIL_MAILER', config('mail.default')))
@@ -409,6 +414,74 @@ class Settings extends Page implements HasForms
                         ->default(env('AWS_USE_PATH_STYLE_ENDPOINT', config('backups.disks.s3.use_path_style_endpoint'))),
                 ]),
         ];
+    }
+
+    private function oauthSettings(): array
+    {
+        $oauthProviders = Config::get('auth.oauth');
+
+        $formFields = [];
+
+        foreach ($oauthProviders as $providerName => $providerConfig) {
+            $providerEnvPrefix = strtoupper($providerName);
+
+            $fields = [
+                Toggle::make("OAUTH_{$providerEnvPrefix}_ENABLED")
+                    ->onColor('success')
+                    ->offColor('danger')
+                    ->onIcon('tabler-check')
+                    ->offIcon('tabler-x')
+                    ->live()
+                    ->columnSpan(1)
+                    ->label('Enabled')
+                    ->default(env("OAUTH_{$providerEnvPrefix}_ENABLED", false)),
+            ];
+
+            if (array_key_exists('client_id', $providerConfig['service'] ?? [])) {
+                $fields[] = TextInput::make("OAUTH_{$providerEnvPrefix}_CLIENT_ID")
+                    ->label('Client ID')
+                    ->columnSpan(2)
+                    ->required()
+                    ->password()
+                    ->revealable()
+                    ->autocomplete(false)
+                    ->hidden(fn (Get $get) => !$get("OAUTH_{$providerEnvPrefix}_ENABLED"))
+                    ->default(env("OAUTH_{$providerEnvPrefix}_CLIENT_ID", $providerConfig['service']['client_id'] ?? ''))
+                    ->placeholder('Client ID');
+            }
+
+            if (array_key_exists('client_secret', $providerConfig['service'] ?? [])) {
+                $fields[] = TextInput::make("OAUTH_{$providerEnvPrefix}_CLIENT_SECRET")
+                    ->label('Client Secret')
+                    ->columnSpan(2)
+                    ->required()
+                    ->password()
+                    ->revealable()
+                    ->autocomplete(false)
+                    ->hidden(fn (Get $get) => !$get("OAUTH_{$providerEnvPrefix}_ENABLED"))
+                    ->default(env("OAUTH_{$providerEnvPrefix}_CLIENT_SECRET", $providerConfig['service']['client_secret'] ?? ''))
+                    ->placeholder('Client Secret');
+            }
+
+            if (array_key_exists('base_url', $providerConfig['service'] ?? [])) {
+                $fields[] = TextInput::make("OAUTH_{$providerEnvPrefix}_BASE_URL")
+                    ->label('Base URL')
+                    ->columnSpanFull()
+                    ->autocomplete(false)
+                    ->hidden(fn (Get $get) => !$get("OAUTH_{$providerEnvPrefix}_ENABLED"))
+                    ->default(env("OAUTH_{$providerEnvPrefix}_BASE_URL", ''))
+                    ->placeholder('Base URL');
+            }
+
+            $formFields[] = Section::make(ucfirst($providerName))
+                ->columns(5)
+                ->icon($providerConfig['icon'] ?? 'tabler-brand-oauth')
+                ->collapsed(fn () => !env("OAUTH_{$providerEnvPrefix}_ENABLED", false))
+                ->collapsible()
+                ->schema($fields);
+        }
+
+        return $formFields;
     }
 
     private function miscSettings(): array

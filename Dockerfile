@@ -54,6 +54,6 @@ HEALTHCHECK --interval=5m --timeout=10s --start-period=5s --retries=3 \
 EXPOSE 80 443
 
 VOLUME /pelican-data
-
+RUN chown -R www-data:www-data /var/www/html && chmod -R 755 /var/www/html/storage/* /var/www/html/bootstrap/cache/
 ENTRYPOINT [ "/bin/ash", ".github/docker/entrypoint.sh" ]
 CMD [ "supervisord", "-n", "-c", "/etc/supervisord.conf" ]

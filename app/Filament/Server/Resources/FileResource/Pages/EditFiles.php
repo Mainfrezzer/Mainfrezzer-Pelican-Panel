@@ -24,6 +24,7 @@ use Filament\Panel;
 use Filament\Resources\Pages\Page;
 use Filament\Resources\Pages\PageRegistration;
 use Filament\Support\Enums\Alignment;
+use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Route as RouteFacade;
 use Livewire\Attributes\Locked;
@@ -40,6 +41,8 @@ class EditFiles extends Page
     protected static string $resource = FileResource::class;
 
     protected static string $view = 'filament.server.pages.edit-file';
+
+    protected static ?string $title = '';
 
     #[Locked]
     public string $path;
@@ -62,22 +65,25 @@ class EditFiles extends Page
                     ->options(EditorLanguages::class)
                     ->hidden() //TODO Fix Dis
                     ->default(function () {
-                        $split = explode('.', $this->path);
+                        $ext = pathinfo($this->path, PATHINFO_EXTENSION);
 
-                        return end($split);
+                        if ($ext === 'yml') {
+                            return 'yaml';
+                        }
+
+                        return $ext;
                     }),
                 Section::make('Editing: ' . $this->path)
                     ->footerActions([
                         Action::make('save')
-                            ->label('Save Changes')
+                            ->label('Save')
                             ->authorize(fn () => auth()->user()->can(Permission::ACTION_FILE_UPDATE, $server))
                             ->icon('tabler-device-floppy')
                             ->keyBindings('mod+s')
-                            ->action(function () use ($server) {
+                            ->action(function (DaemonFileRepository $fileRepository) use ($server) {
                                 $data = $this->form->getState();
 
-                                // @phpstan-ignore-next-line
-                                app(DaemonFileRepository::class)
+                                $fileRepository
                                     ->setServer($server)
                                     ->putContent($this->path, $data['editor'] ?? '');
 
@@ -91,6 +97,8 @@ class EditFiles extends Page
                                     ->title('Saved File')
                                     ->body(fn () => $this->path)
                                     ->send();
+
+                                $this->redirect(ListFiles::getUrl(['path' => dirname($this->path)]));
                             }),
                         Action::make('cancel')
                             ->label('Cancel')
@@ -103,11 +111,14 @@ class EditFiles extends Page
                         MonacoEditor::make('editor')
                             ->label('')
                             ->placeholderText('')
-                            ->formatStateUsing(function () use ($server) {
-                                // @phpstan-ignore-next-line
-                                return app(DaemonFileRepository::class)
-                                    ->setServer($server)
-                                    ->getContent($this->path, config('panel.files.max_edit_size'));
+                            ->formatStateUsing(function (DaemonFileRepository $fileRepository) use ($server) {
+                                try {
+                                    return $fileRepository
+                                        ->setServer($server)
+                                        ->getContent($this->path, config('panel.files.max_edit_size'));
+                                } catch (FileNotFoundException) {
+                                    abort(404, $this->path . ' not found.');
+                                }
                             })
                             ->language(fn (Get $get) => $get('lang') ?? 'plaintext')
                             ->view('filament.plugins.monaco-editor'),

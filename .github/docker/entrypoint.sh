@@ -67,7 +67,6 @@ echo "Starting PHP-FPM with NGINX"
 cp /var/www/html/.github/docker/magnon.conf /etc/nginx/http.d/default.conf
 nginx
 
-
 chown -R www-data:www-data /pelican-data/.env /pelican-data/database
 
 echo "Starting Supervisord"
