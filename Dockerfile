@@ -20,7 +20,7 @@ WORKDIR /var/www/html
 
 # Install dependencies
 RUN apk update && apk add --no-cache \
-    libpng-dev libjpeg-turbo-dev freetype-dev libzip-dev icu-dev nginx \
+    libpng-dev libjpeg-turbo-dev freetype-dev libzip-dev icu-dev nginx mysql-client \
     zip unzip curl \
     caddy ca-certificates supervisor \
     && docker-php-ext-install bcmath gd intl zip opcache pcntl posix pdo_mysql

@@ -68,5 +68,8 @@ cp /var/www/html/.github/docker/magnon.conf /etc/nginx/http.d/default.conf
 nginx
 
 chown -R www-data:www-data /pelican-data/.env /pelican-data/database
+#Ensure Perms are correct
+chown -R www-data:www-data /var/www/html
+chmod -R 755 /var/www/html/storage/* /var/www/html/bootstrap/cache/
 echo "Starting Supervisord"
 exec "$@"
