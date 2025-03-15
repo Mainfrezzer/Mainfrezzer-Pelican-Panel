@@ -7,13 +7,14 @@ use Illuminate\Http\Response;
 use App\Models\Allocation;
 use App\Models\Permission;
 use App\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class NetworkAllocationControllerTest extends ClientApiIntegrationTestCase
 {
     /**
      * Test that a servers allocations are returned in the expected format.
      */
-    public function testServerAllocationsAreReturned(): void
+    public function test_server_allocations_are_returned(): void
     {
         [$user, $server] = $this->generateTestAccount();
 
@@ -29,7 +30,7 @@ class NetworkAllocationControllerTest extends ClientApiIntegrationTestCase
     /**
      * Test that allocations cannot be returned without the required user permissions.
      */
-    public function testServerAllocationsAreNotReturnedWithoutPermission(): void
+    public function test_server_allocations_are_not_returned_without_permission(): void
     {
         [$user, $server] = $this->generateTestAccount();
         $user2 = User::factory()->create();
@@ -48,10 +49,9 @@ class NetworkAllocationControllerTest extends ClientApiIntegrationTestCase
 
     /**
      * Tests that notes on an allocation can be set correctly.
-     *
-     * @dataProvider updatePermissionsDataProvider
      */
-    public function testAllocationNotesCanBeUpdated(array $permissions): void
+    #[DataProvider('updatePermissionsDataProvider')]
+    public function test_allocation_notes_can_be_updated(array $permissions): void
     {
         [$user, $server] = $this->generateTestAccount($permissions);
         $allocation = $server->allocation;
@@ -81,7 +81,7 @@ class NetworkAllocationControllerTest extends ClientApiIntegrationTestCase
         $this->assertNull($allocation->notes);
     }
 
-    public function testAllocationNotesCannotBeUpdatedByInvalidUsers(): void
+    public function test_allocation_notes_cannot_be_updated_by_invalid_users(): void
     {
         [$user, $server] = $this->generateTestAccount();
         $user2 = User::factory()->create();
@@ -96,10 +96,8 @@ class NetworkAllocationControllerTest extends ClientApiIntegrationTestCase
         $this->actingAs($user)->postJson($this->link($server->allocation))->assertForbidden();
     }
 
-    /**
-     * @dataProvider updatePermissionsDataProvider
-     */
-    public function testPrimaryAllocationCanBeModified(array $permissions): void
+    #[DataProvider('updatePermissionsDataProvider')]
+    public function test_primary_allocation_can_be_modified(array $permissions): void
     {
         [$user, $server] = $this->generateTestAccount($permissions);
         $allocation = $server->allocation;
@@ -116,7 +114,7 @@ class NetworkAllocationControllerTest extends ClientApiIntegrationTestCase
         $this->assertSame($allocation2->id, $server->allocation_id);
     }
 
-    public function testPrimaryAllocationCannotBeModifiedByInvalidUser(): void
+    public function test_primary_allocation_cannot_be_modified_by_invalid_user(): void
     {
         [$user, $server] = $this->generateTestAccount();
         $user2 = User::factory()->create();

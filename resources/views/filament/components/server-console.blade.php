@@ -11,24 +11,25 @@
 
     <div id="terminal" wire:ignore></div>
 
-    <div class="flex items-center w-full border-top overflow-hidden"
-         style="background-color: #202A32; border-bottom-right-radius: 10px; border-bottom-left-radius: 10px;">
-        <x-filament::icon
-            icon="tabler-chevrons-right"
-        />
-        <input
-            class="w-full focus:outline-none focus:ring-0 border-none"
-            style="background-color: #202A32;"
-            type="text"
-            :readonly="{{ $this->canSendCommand() ? 'false' : 'true' }}"
-            title="{{ $this->canSendCommand() ? '' : 'Can\'t send command when the server is Offline' }}"
-            placeholder="{{ $this->canSendCommand() ? 'Type a command...' : 'Server Offline...' }}"
-            wire:model="input"
-            wire:keydown.enter="enter"
-            wire:keydown.up.prevent="up"
-            wire:keydown.down="down"
-        >
-    </div>
+    @if ($this->authorizeSendCommand())
+        <div class="flex items-center w-full border-top overflow-hidden dark:bg-gray-900"
+             style="border-bottom-right-radius: 10px; border-bottom-left-radius: 10px;">
+            <x-filament::icon
+                icon="tabler-chevrons-right"
+            />
+            <input
+                class="w-full focus:outline-none focus:ring-0 border-none dark:bg-gray-900"
+                type="text"
+                :readonly="{{ $this->canSendCommand() ? 'false' : 'true' }}"
+                title="{{ $this->canSendCommand() ? '' : 'Can\'t send command when the server is Offline' }}"
+                placeholder="{{ $this->canSendCommand() ? 'Type a command...' : 'Server Offline...' }}"
+                wire:model="input"
+                wire:keydown.enter="enter"
+                wire:keydown.up.prevent="up"
+                wire:keydown.down="down"
+            >
+        </div>
+    @endif
 
     @script
     <script>
@@ -55,10 +56,11 @@
         };
 
         let options = {
-            fontSize: 16,
+            fontSize: 14,
+            lineHeight: 1.2,
             disableStdin: true,
             cursorStyle: 'underline',
-            cursorInactiveStyle: 'none',
+            cursorInactiveStyle: 'underline',
             allowTransparency: true,
             rows: 30,
             theme: theme
@@ -112,7 +114,10 @@
             terminal.writeln(TERMINAL_PRELUDE + 'Server marked as ' + state + '...\u001b[0m');
 
         const socket = new WebSocket("{{ $this->getSocket() }}");
-        let token = '{{ $this->getToken() }}';
+
+        socket.onerror = (event) => {
+            $wire.dispatchSelf('websocket-error');
+        };
 
         socket.onmessage = function(websocketMessageEvent) {
             let { event, args } = JSON.parse(websocketMessageEvent.data);
@@ -142,29 +147,15 @@
                         'args': [null]
                     }));
                     break;
-                case 'install started':
-                    $wire.dispatch('console-install-started');
-                    break;
-                case 'install completed':
-                    $wire.dispatch('console-install-completed');
-                    break;
                 case 'token expiring':
                 case 'token expired':
-                    token = '{{ $this->getToken() }}';
-
-                    socket.send(JSON.stringify({
-                        'event': 'auth',
-                        'args': [token]
-                    }));
+                    $wire.dispatchSelf('token-request');
                     break;
             }
         };
 
         socket.onopen = (event) => {
-            socket.send(JSON.stringify({
-                'event': 'auth',
-                'args': [token]
-            }));
+            $wire.dispatchSelf('token-request');
         };
 
         Livewire.on('setServerState', ({ state, uuid }) => {
@@ -176,6 +167,13 @@
             socket.send(JSON.stringify({
                 'event': 'set state',
                 'args': [state]
+            }));
+        });
+
+        $wire.on('sendAuthRequest', ({ token }) => {
+            socket.send(JSON.stringify({
+                'event': 'auth',
+                'args': [token]
             }));
         });
 

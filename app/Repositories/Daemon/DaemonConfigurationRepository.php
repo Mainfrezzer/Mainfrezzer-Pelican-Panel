@@ -3,8 +3,7 @@
 namespace App\Repositories\Daemon;
 
 use App\Models\Node;
-use GuzzleHttp\Exception\TransferException;
-use App\Exceptions\Http\Connection\DaemonConnectionException;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 
 class DaemonConfigurationRepository extends DaemonRepository
@@ -12,20 +11,30 @@ class DaemonConfigurationRepository extends DaemonRepository
     /**
      * Returns system information from the daemon instance.
      *
-     * @throws \App\Exceptions\Http\Connection\DaemonConnectionException
+     * @return array<mixed>
+     *
+     * @throws ConnectionException
      */
-    public function getSystemInformation(?int $version = null, int $connectTimeout = 5): array
+    public function getSystemInformation(): array
     {
-        try {
-            $response = $this
-                ->getHttpClient()
-                ->connectTimeout($connectTimeout)
-                ->get('/api/system' . (!is_null($version) ? '?v=' . $version : ''));
-        } catch (TransferException $exception) {
-            throw new DaemonConnectionException($exception);
-        }
+        return $this->getHttpClient()
+            ->connectTimeout(3)
+            ->get('/api/system')
+            ->throwIf(function ($result) {
+                $header = $result->header('User-Agent');
+                if (
+                    filled($header) &&
+                    preg_match('/^Pelican Wings\/v(?:\d+\.\d+\.\d+|develop) \(id:(\w*)\)$/', $header, $matches) &&
+                    array_get($matches, 1, '') !== $this->node->daemon_token_id
+                ) {
+                    throw new ConnectionException($result->effectiveUri()->__toString() . ' does not match node token_id !');
+                }
+                if (!$result->collect()->has(['architecture', 'cpu_count', 'kernel_version', 'os', 'version'])) {
+                    throw new ConnectionException($result->effectiveUri()->__toString() . ' is not Pelican Wings !');
+                }
 
-        return $response->json() ?? [];
+                return true;
+            })->json();
     }
 
     /**
@@ -33,17 +42,10 @@ class DaemonConfigurationRepository extends DaemonRepository
      * this instance using a passed-in model. This allows us to change plenty of information
      * in the model, and still use the old, pre-update model to actually make the HTTP request.
      *
-     * @throws \App\Exceptions\Http\Connection\DaemonConnectionException
+     * @throws ConnectionException
      */
     public function update(Node $node): Response
     {
-        try {
-            return $this->getHttpClient()->post(
-                '/api/update',
-                $node->getConfiguration(),
-            );
-        } catch (TransferException $exception) {
-            throw new DaemonConnectionException($exception);
-        }
+        return $this->getHttpClient()->post('/api/update', $node->getConfiguration());
     }
 }

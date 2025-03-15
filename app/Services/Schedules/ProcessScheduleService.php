@@ -2,6 +2,8 @@
 
 namespace App\Services\Schedules;
 
+use App\Enums\ContainerStatus;
+use App\Models\Task;
 use Exception;
 use App\Models\Schedule;
 use Illuminate\Contracts\Bus\Dispatcher;
@@ -9,22 +11,17 @@ use App\Jobs\Schedule\RunTaskJob;
 use Illuminate\Database\ConnectionInterface;
 use App\Exceptions\DisplayException;
 use App\Repositories\Daemon\DaemonServerRepository;
-use App\Exceptions\Http\Connection\DaemonConnectionException;
 
 class ProcessScheduleService
 {
-    /**
-     * ProcessScheduleService constructor.
-     */
     public function __construct(private ConnectionInterface $connection, private Dispatcher $dispatcher, private DaemonServerRepository $serverRepository) {}
 
     /**
      * Process a schedule and push the first task onto the queue worker.
-     *
-     * @throws \Throwable
      */
     public function handle(Schedule $schedule, bool $now = false): void
     {
+        /** @var ?Task $task */
         $task = $schedule->tasks()->orderBy('sequence_id')->first();
 
         if (!$task) {
@@ -45,21 +42,15 @@ class ProcessScheduleService
             // Check that the server is currently in a starting or running state before executing
             // this schedule if this option has been set.
             try {
-                $details = $this->serverRepository->setServer($schedule->server)->getDetails();
-                $state = $details['state'] ?? 'offline';
+                $state = fluent($this->serverRepository->setServer($schedule->server)->getDetails())->get('state') ?? ContainerStatus::Offline;
+
                 // If the server is stopping or offline just do nothing with this task.
-                if (in_array($state, ['offline', 'stopping'])) {
+                if ($state->isOffline()) {
                     $job->failed();
 
                     return;
                 }
-            } catch (\Exception $exception) {
-                if (!$exception instanceof DaemonConnectionException) {
-                    // If we encountered some exception during this process that wasn't just an
-                    // issue connecting to daemon run the failed sequence for a job. Otherwise we
-                    // can just quietly mark the task as completed without actually running anything.
-                    $job->failed($exception);
-                }
+            } catch (Exception) {
                 $job->failed();
 
                 return;
@@ -73,8 +64,8 @@ class ProcessScheduleService
             // so we need to manually trigger it and then continue with the exception throw.
             try {
                 $this->dispatcher->dispatchNow($job);
-            } catch (\Exception $exception) {
-                $job->failed($exception);
+            } catch (Exception $exception) {
+                $job->failed();
 
                 throw $exception;
             }

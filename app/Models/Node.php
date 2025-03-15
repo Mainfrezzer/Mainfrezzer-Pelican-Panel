@@ -2,14 +2,17 @@
 
 namespace App\Models;
 
+use App\Contracts\Validatable;
 use App\Exceptions\Service\HasActiveServersException;
 use App\Repositories\Daemon\DaemonConfigurationRepository;
+use App\Traits\HasValidation;
 use Exception;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Symfony\Component\Yaml\Yaml;
@@ -37,7 +40,7 @@ use Symfony\Component\Yaml\Yaml;
  * @property int $daemon_sftp
  * @property string|null $daemon_sftp_alias
  * @property string $daemon_base
- * @property array $tags
+ * @property string[] $tags
  * @property \Carbon\Carbon $created_at
  * @property \Carbon\Carbon $updated_at
  * @property \App\Models\Mount[]|\Illuminate\Database\Eloquent\Collection $mounts
@@ -47,8 +50,10 @@ use Symfony\Component\Yaml\Yaml;
  * @property \App\Models\Allocation[]|\Illuminate\Database\Eloquent\Collection $allocations
  * @property int|null $allocations_count
  */
-class Node extends Model
+class Node extends Model implements Validatable
 {
+    use HasFactory;
+    use HasValidation;
     use Notifiable;
 
     /**
@@ -60,11 +65,6 @@ class Node extends Model
     public const DAEMON_TOKEN_ID_LENGTH = 16;
 
     public const DAEMON_TOKEN_LENGTH = 64;
-
-    /**
-     * The table associated with the model.
-     */
-    protected $table = 'nodes';
 
     /**
      * The attributes excluded from the model's JSON form.
@@ -84,25 +84,26 @@ class Node extends Model
         'description', 'maintenance_mode', 'tags',
     ];
 
+    /** @var array<array-key, string[]> */
     public static array $validationRules = [
-        'name' => 'required|string|min:1|max:100',
-        'description' => 'string|nullable',
-        'public' => 'boolean',
-        'fqdn' => 'required|string',
-        'scheme' => 'required|string|in:http,https',
-        'behind_proxy' => 'boolean',
-        'memory' => 'required|numeric|min:0',
-        'memory_overallocate' => 'required|numeric|min:-1',
-        'disk' => 'required|numeric|min:0',
-        'disk_overallocate' => 'required|numeric|min:-1',
-        'cpu' => 'required|numeric|min:0',
-        'cpu_overallocate' => 'required|numeric|min:-1',
-        'daemon_base' => 'sometimes|required|regex:/^([\/][\d\w.\-\/]+)$/',
-        'daemon_sftp' => 'required|numeric|between:1,65535',
-        'daemon_sftp_alias' => 'nullable|string',
-        'daemon_listen' => 'required|numeric|between:1,65535',
-        'maintenance_mode' => 'boolean',
-        'upload_size' => 'int|between:1,1024',
+        'name' => ['required', 'string', 'min:1', 'max:100'],
+        'description' => ['string', 'nullable'],
+        'public' => ['boolean'],
+        'fqdn' => ['required', 'string'],
+        'scheme' => ['required', 'string', 'in:http,https'],
+        'behind_proxy' => ['boolean'],
+        'memory' => ['required', 'numeric', 'min:0'],
+        'memory_overallocate' => ['required', 'numeric', 'min:-1'],
+        'disk' => ['required', 'numeric', 'min:0'],
+        'disk_overallocate' => ['required', 'numeric', 'min:-1'],
+        'cpu' => ['required', 'numeric', 'min:0'],
+        'cpu_overallocate' => ['required', 'numeric', 'min:-1'],
+        'daemon_base' => ['sometimes', 'required', 'regex:/^([\/][\d\w.\-\/]+)$/'],
+        'daemon_sftp' => ['required', 'numeric', 'between:1,65535'],
+        'daemon_sftp_alias' => ['nullable', 'string'],
+        'daemon_listen' => ['required', 'numeric', 'between:1,65535'],
+        'maintenance_mode' => ['boolean'],
+        'upload_size' => ['int', 'between:1,1024'],
     ];
 
     /**
@@ -146,11 +147,6 @@ class Node extends Model
 
     public int $servers_sum_cpu = 0;
 
-    public function getRouteKeyName(): string
-    {
-        return 'id';
-    }
-
     protected static function booted(): void
     {
         static::creating(function (self $node) {
@@ -176,6 +172,22 @@ class Node extends Model
 
     /**
      * Returns the configuration as an array.
+     *
+     * @return array{
+     *     debug: bool,
+     *     uuid: string,
+     *     token_id: string,
+     *     token: string,
+     *     api: array{
+     *         host: string,
+     *         port: int,
+     *         ssl: array{enabled: bool, cert: string, key: string},
+     *         upload_limit: int
+     *     },
+     *     system: array{data: string, sftp: array{bind_port: int}},
+     *     allowed_mounts: string[],
+     *     remote: string,
+     * }
      */
     public function getConfiguration(): array
     {
@@ -201,7 +213,7 @@ class Node extends Model
                 ],
             ],
             'allowed_mounts' => $this->mounts->pluck('source')->toArray(),
-            'remote' => route('index'),
+            'remote' => route('filament.app.resources...index'),
         ];
     }
 
@@ -247,6 +259,9 @@ class Node extends Model
         return $this->hasMany(Allocation::class);
     }
 
+    /**
+     * @return BelongsToMany<DatabaseHost, $this>
+     */
     public function databaseHosts(): BelongsToMany
     {
         return $this->belongsToMany(DatabaseHost::class);
@@ -281,36 +296,14 @@ class Node extends Model
         return true;
     }
 
-    public static function getForServerCreation(): Collection
-    {
-        return self::with('allocations')->get()->map(function (Node $item) {
-            $filtered = $item->getRelation('allocations')->where('server_id', null)->map(function ($map) {
-                return collect($map)->only(['id', 'ip', 'port']);
-            });
-
-            $ports = $filtered->map(function ($map) {
-                return [
-                    'id' => $map['id'],
-                    'text' => sprintf('%s:%s', $map['ip'], $map['port']),
-                ];
-            })->values();
-
-            return [
-                'id' => $item->id,
-                'text' => $item->name,
-                'allocations' => $ports,
-            ];
-        })->values();
-    }
-
+    /** @return array<mixed> */
     public function systemInformation(): array
     {
         return once(function () {
             try {
-                // @phpstan-ignore-next-line
-                return resolve(DaemonConfigurationRepository::class)
+                return (new DaemonConfigurationRepository())
                     ->setNode($this)
-                    ->getSystemInformation(connectTimeout: 3);
+                    ->getSystemInformation();
             } catch (Exception $exception) {
                 $message = str($exception->getMessage());
 
@@ -327,6 +320,9 @@ class Node extends Model
         });
     }
 
+    /**
+     * @return array<array-key, mixed>
+     */
     public function serverStatuses(): array
     {
         $statuses = [];
@@ -344,6 +340,14 @@ class Node extends Model
         return $statuses;
     }
 
+    /** @return array{
+     *     memory_total: int, memory_used: int,
+     *     swap_total: int, swap_used: int,
+     *     load_average1: float, load_average5: float, load_average15: float,
+     *     cpu_percent: float,
+     *     disk_total: int, disk_used: int,
+     * }
+     */
     public function statistics(): array
     {
         $default = [
@@ -360,6 +364,8 @@ class Node extends Model
         ];
 
         try {
+            $this->systemInformation();
+
             return Http::daemon($this)
                 ->connectTimeout(1)
                 ->timeout(1)
@@ -370,27 +376,25 @@ class Node extends Model
         }
     }
 
+    /** @return string[] */
     public function ipAddresses(): array
     {
         return cache()->remember("nodes.$this->id.ips", now()->addHour(), function () {
             $ips = collect();
-            if (is_ip($this->fqdn)) {
-                $ips = $ips->push($this->fqdn);
-            } elseif ($dnsRecords = gethostbynamel($this->fqdn)) {
-                $ips = $ips->concat($dnsRecords);
-            }
 
             try {
                 $addresses = Http::daemon($this)->connectTimeout(1)->timeout(1)->get('/api/system/ips')->json();
                 $ips = $ips->concat(fluent($addresses)->get('ip_addresses'));
             } catch (Exception) {
-                // pass
+                if (is_ip($this->fqdn)) {
+                    $ips->push($this->fqdn);
+                }
             }
-
-            $ips->push('0.0.0.0');
 
             // Only IPV4
             $ips = $ips->filter(fn (string $ip) => filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false);
+
+            $ips->push('0.0.0.0');
 
             return $ips->unique()->all();
         });

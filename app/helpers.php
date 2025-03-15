@@ -31,7 +31,7 @@ if (!function_exists('convert_bytes_to_readable')) {
         $fromBase = log($bytes) / log($conversionUnit);
         $base ??= floor($fromBase);
 
-        return round(pow($conversionUnit, $fromBase - $base), $decimals) . ' ' . $suffix[$base];
+        return Number::format(pow($conversionUnit, $fromBase - $base), $decimals, locale: auth()->user()->language) . ' ' . $suffix[$base];
     }
 }
 
@@ -49,8 +49,7 @@ if (!function_exists('join_paths')) {
 if (!function_exists('resolve_path')) {
     function resolve_path(string $path): string
     {
-        // @phpstan-ignore-next-line
-        $parts = array_filter(explode('/', $path), 'strlen');
+        $parts = array_filter(explode('/', $path), fn (string $p) => strlen($p) > 0);
 
         $absolutes = [];
         foreach ($parts as $part) {

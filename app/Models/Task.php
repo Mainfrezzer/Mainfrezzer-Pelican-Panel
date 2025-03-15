@@ -2,6 +2,10 @@
 
 namespace App\Models;
 
+use App\Contracts\Validatable;
+use App\Traits\HasValidation;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -19,8 +23,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property \App\Models\Schedule $schedule
  * @property \App\Models\Server $server
  */
-class Task extends Model
+class Task extends Model implements Validatable
 {
+    use HasFactory;
+    use HasValidation;
+
     /**
      * The resource name for this model when it is transformed into an
      * API representation using fractal.
@@ -39,12 +46,9 @@ class Task extends Model
     public const ACTION_DELETE_FILES = 'delete_files';
 
     /**
-     * The table associated with the model.
-     */
-    protected $table = 'tasks';
-
-    /**
      * Relationships to be updated when this model is updated.
+     *
+     * @var string[]
      */
     protected $touches = ['schedule'];
 
@@ -70,14 +74,15 @@ class Task extends Model
         'continue_on_failure' => false,
     ];
 
+    /** @var array<array-key, string[]> */
     public static array $validationRules = [
-        'schedule_id' => 'required|numeric|exists:schedules,id',
-        'sequence_id' => 'required|numeric|min:1',
-        'action' => 'required|string',
-        'payload' => 'required_unless:action,backup|string',
-        'time_offset' => 'required|numeric|between:0,900',
-        'is_queued' => 'boolean',
-        'continue_on_failure' => 'boolean',
+        'schedule_id' => ['required', 'numeric', 'exists:schedules,id'],
+        'sequence_id' => ['required', 'numeric', 'min:1'],
+        'action' => ['required', 'string'],
+        'payload' => ['required_unless:action,backup', 'string'],
+        'time_offset' => ['required', 'numeric', 'between:0,900'],
+        'is_queued' => ['boolean'],
+        'continue_on_failure' => ['boolean'],
     ];
 
     protected function casts(): array
@@ -90,11 +95,6 @@ class Task extends Model
             'is_queued' => 'boolean',
             'continue_on_failure' => 'boolean',
         ];
-    }
-
-    public function getRouteKeyName(): string
-    {
-        return $this->getKeyName();
     }
 
     /**

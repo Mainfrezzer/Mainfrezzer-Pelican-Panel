@@ -9,13 +9,14 @@ use App\Services\Acl\Api\AdminAcl;
 use App\Transformers\Api\Application\UserTransformer;
 use App\Transformers\Api\Application\ServerTransformer;
 use App\Tests\Integration\Api\Application\ApplicationApiIntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class UserControllerTest extends ApplicationApiIntegrationTestCase
 {
     /**
      * Test the response when requesting all users on the panel.
      */
-    public function testGetUsers(): void
+    public function test_get_users(): void
     {
         $user = User::factory()->create();
 
@@ -82,7 +83,7 @@ class UserControllerTest extends ApplicationApiIntegrationTestCase
     /**
      * Test getting a single user.
      */
-    public function testGetSingleUser(): void
+    public function test_get_single_user(): void
     {
         $user = User::factory()->create();
 
@@ -114,7 +115,7 @@ class UserControllerTest extends ApplicationApiIntegrationTestCase
     /**
      * Test that the correct relationships can be loaded.
      */
-    public function testRelationshipsCanBeLoaded(): void
+    public function test_relationships_can_be_loaded(): void
     {
         $user = User::factory()->create();
         $server = $this->createServerModel(['user_id' => $user->id]);
@@ -145,7 +146,7 @@ class UserControllerTest extends ApplicationApiIntegrationTestCase
      * Test that attempting to load a relationship that the key does not have permission
      * for returns a null object.
      */
-    public function testKeyWithoutPermissionCannotLoadRelationship(): void
+    public function test_key_without_permission_cannot_load_relationship(): void
     {
         $this->createNewDefaultApiKey($this->getApiUser(), [Server::RESOURCE_NAME => AdminAcl::NONE]);
 
@@ -179,7 +180,7 @@ class UserControllerTest extends ApplicationApiIntegrationTestCase
     /**
      * Test that an invalid external ID returns a 404 error.
      */
-    public function testGetMissingUser(): void
+    public function test_get_missing_user(): void
     {
         $response = $this->getJson('/api/application/users/nil');
         $this->assertNotFoundJson($response);
@@ -189,7 +190,7 @@ class UserControllerTest extends ApplicationApiIntegrationTestCase
      * Test that an authentication error occurs if a key does not have permission
      * to access a resource.
      */
-    public function testErrorReturnedIfNoPermission(): void
+    public function test_error_returned_if_no_permission(): void
     {
         $user = User::factory()->create();
         $this->createNewDefaultApiKey($this->getApiUser(), [User::RESOURCE_NAME => AdminAcl::NONE]);
@@ -201,7 +202,7 @@ class UserControllerTest extends ApplicationApiIntegrationTestCase
     /**
      * Test that a user can be created.
      */
-    public function testCreateUser(): void
+    public function test_create_user(): void
     {
         $response = $this->postJson('/api/application/users', [
             'username' => 'testuser',
@@ -231,7 +232,7 @@ class UserControllerTest extends ApplicationApiIntegrationTestCase
     /**
      * Test that a user can be updated.
      */
-    public function testUpdateUser(): void
+    public function test_update_user(): void
     {
         $user = User::factory()->create();
 
@@ -258,7 +259,7 @@ class UserControllerTest extends ApplicationApiIntegrationTestCase
     /**
      * Test that a user can be deleted from the database.
      */
-    public function testDeleteUser(): void
+    public function test_delete_user(): void
     {
         $user = User::factory()->create();
         $this->assertDatabaseHas('users', ['id' => $user->id]);
@@ -272,10 +273,9 @@ class UserControllerTest extends ApplicationApiIntegrationTestCase
     /**
      * Test that an API key without write permissions cannot create, update, or
      * delete a user model.
-     *
-     * @dataProvider userWriteEndpointsDataProvider
      */
-    public function testApiKeyWithoutWritePermissions(string $method, string $url): void
+    #[DataProvider('userWriteEndpointsDataProvider')]
+    public function test_api_key_without_write_permissions(string $method, string $url): void
     {
         $this->createNewDefaultApiKey($this->getApiUser(), [User::RESOURCE_NAME => AdminAcl::READ]);
 

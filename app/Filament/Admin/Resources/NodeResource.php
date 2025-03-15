@@ -15,6 +15,26 @@ class NodeResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
+    public static function getNavigationLabel(): string
+    {
+        return trans('admin/node.nav_title');
+    }
+
+    public static function getModelLabel(): string
+    {
+        return trans('admin/node.model_label');
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return trans('admin/node.model_label_plural');
+    }
+
+    public static function getNavigationGroup(): ?string
+    {
+        return trans('admin/dashboard.server');
+    }
+
     public static function getNavigationBadge(): ?string
     {
         return static::getModel()::count() ?: null;

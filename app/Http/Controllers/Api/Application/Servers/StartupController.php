@@ -2,13 +2,18 @@
 
 namespace App\Http\Controllers\Api\Application\Servers;
 
+use App\Exceptions\Model\DataValidationException;
 use App\Models\User;
 use App\Models\Server;
 use App\Services\Servers\StartupModificationService;
 use App\Transformers\Api\Application\ServerTransformer;
 use App\Http\Controllers\Api\Application\ApplicationApiController;
 use App\Http\Requests\Api\Application\Servers\UpdateServerStartupRequest;
+use Dedoc\Scramble\Attributes\Group;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Validation\ValidationException;
 
+#[Group('Server', weight: 3)]
 class StartupController extends ApplicationApiController
 {
     /**
@@ -20,11 +25,15 @@ class StartupController extends ApplicationApiController
     }
 
     /**
+     * Update startup
+     *
      * Update the startup and environment settings for a specific server.
      *
-     * @throws \Illuminate\Validation\ValidationException
-     * @throws \App\Exceptions\Http\Connection\DaemonConnectionException
-     * @throws \App\Exceptions\Model\DataValidationException
+     * @return array<array-key, mixed>
+     *
+     * @throws ValidationException
+     * @throws ConnectionException
+     * @throws DataValidationException
      */
     public function index(UpdateServerStartupRequest $request, Server $server): array
     {

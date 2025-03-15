@@ -3,6 +3,7 @@
 namespace App\Tests\Integration\Services\Servers;
 
 use App\Enums\ServerState;
+use App\Enums\SuspendAction;
 use Mockery\MockInterface;
 use App\Services\Servers\SuspensionService;
 use App\Tests\Integration\IntegrationTestCase;
@@ -23,45 +24,35 @@ class SuspensionServiceTest extends IntegrationTestCase
         $this->app->instance(DaemonServerRepository::class, $this->repository);
     }
 
-    public function testServerIsSuspendedAndUnsuspended(): void
+    public function test_server_is_suspended_and_unsuspended(): void
     {
         $server = $this->createServerModel();
 
         $this->repository->expects('setServer->sync')->twice()->andReturnSelf();
 
-        $this->getService()->toggle($server);
+        $this->getService()->handle($server, SuspendAction::Suspend);
 
         $this->assertTrue($server->refresh()->isSuspended());
 
-        $this->getService()->toggle($server, SuspensionService::ACTION_UNSUSPEND);
+        $this->getService()->handle($server, SuspendAction::Unsuspend);
 
         $this->assertFalse($server->refresh()->isSuspended());
     }
 
-    public function testNoActionIsTakenIfSuspensionStatusIsUnchanged(): void
+    public function test_no_action_is_taken_if_suspension_status_is_unchanged(): void
     {
         $server = $this->createServerModel();
 
-        $this->getService()->toggle($server, SuspensionService::ACTION_UNSUSPEND);
+        $this->getService()->handle($server, SuspendAction::Unsuspend);
 
         $server->refresh();
         $this->assertFalse($server->isSuspended());
 
         $server->update(['status' => ServerState::Suspended]);
-        $this->getService()->toggle($server);
+        $this->getService()->handle($server, SuspendAction::Suspend);
 
         $server->refresh();
         $this->assertTrue($server->isSuspended());
-    }
-
-    public function testExceptionIsThrownIfInvalidActionsArePassed(): void
-    {
-        $server = $this->createServerModel();
-
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Expected one of: "suspend", "unsuspend". Got: "foo"');
-
-        $this->getService()->toggle($server, 'foo');
     }
 
     private function getService(): SuspensionService

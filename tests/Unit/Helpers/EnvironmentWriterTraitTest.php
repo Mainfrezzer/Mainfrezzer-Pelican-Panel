@@ -4,13 +4,12 @@ namespace App\Tests\Unit\Helpers;
 
 use App\Tests\TestCase;
 use App\Traits\EnvironmentWriterTrait;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class EnvironmentWriterTraitTest extends TestCase
 {
-    /**
-     * @dataProvider variableDataProvider
-     */
-    public function testVariableIsEscapedProperly($input, $expected): void
+    #[DataProvider('variableDataProvider')]
+    public function test_variable_is_escaped_properly($input, $expected): void
     {
         $output = (new FooClass())->escapeEnvironmentValue($input);
 

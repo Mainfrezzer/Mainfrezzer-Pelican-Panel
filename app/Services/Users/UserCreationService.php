@@ -12,17 +12,16 @@ use App\Notifications\AccountCreated;
 
 class UserCreationService
 {
-    /**
-     * UserCreationService constructor.
-     */
     public function __construct(
-        private ConnectionInterface $connection,
-        private Hasher $hasher,
-        private PasswordBroker $passwordBroker,
+        private readonly ConnectionInterface $connection,
+        private readonly Hasher $hasher,
+        private readonly PasswordBroker $passwordBroker,
     ) {}
 
     /**
      * Create a new user on the system.
+     *
+     * @param  array<array-key, mixed>  $data
      *
      * @throws \Exception
      * @throws \App\Exceptions\Model\DataValidationException
@@ -42,6 +41,7 @@ class UserCreationService
         $isRootAdmin = array_key_exists('root_admin', $data) && $data['root_admin'];
         unset($data['root_admin']);
 
+        /** @var User $user */
         $user = User::query()->forceCreate(array_merge($data, [
             'uuid' => Uuid::uuid4()->toString(),
         ]));
@@ -55,7 +55,8 @@ class UserCreationService
         }
 
         $this->connection->commit();
-        $user->notify(new AccountCreated($user, $token ?? null));
+
+        $user->notify(new AccountCreated($token ?? null));
 
         return $user;
     }

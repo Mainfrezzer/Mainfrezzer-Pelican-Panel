@@ -19,26 +19,28 @@ use App\Http\Controllers\Api\Client\ClientApiController;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use App\Http\Requests\Api\Client\Servers\Backups\StoreBackupRequest;
 use App\Http\Requests\Api\Client\Servers\Backups\RestoreBackupRequest;
+use Dedoc\Scramble\Attributes\Group;
 
+#[Group('Server - Backup')]
 class BackupController extends ClientApiController
 {
-    /**
-     * BackupController constructor.
-     */
     public function __construct(
-        private DaemonBackupRepository $daemonRepository,
-        private DeleteBackupService $deleteBackupService,
-        private InitiateBackupService $initiateBackupService,
-        private DownloadLinkService $downloadLinkService,
+        private readonly DaemonBackupRepository $daemonRepository,
+        private readonly DeleteBackupService $deleteBackupService,
+        private readonly InitiateBackupService $initiateBackupService,
+        private readonly DownloadLinkService $downloadLinkService,
     ) {
         parent::__construct();
     }
 
     /**
-     * Returns all the backups for a given server instance in a paginated
-     * result set.
+     * List backups
      *
-     * @throws \Illuminate\Auth\Access\AuthorizationException
+     * Returns all the backups for a given server instance in a paginated result set.
+     *
+     * @return array<array-key, mixed>
+     *
+     * @throws AuthorizationException
      */
     public function index(Request $request, Server $server): array
     {
@@ -57,7 +59,11 @@ class BackupController extends ClientApiController
     }
 
     /**
+     * Create backup
+     *
      * Starts the backup process for a server.
+     *
+     * @return array<array-key, mixed>
      *
      * @throws \Spatie\Fractalistic\Exceptions\InvalidTransformation
      * @throws \Spatie\Fractalistic\Exceptions\NoTransformerSpecified
@@ -89,7 +95,11 @@ class BackupController extends ClientApiController
     }
 
     /**
+     * Toggle lock
+     *
      * Toggles the lock status of a given backup for a server.
+     *
+     * @return array<array-key, mixed>
      *
      * @throws \Throwable
      * @throws \Illuminate\Auth\Access\AuthorizationException
@@ -112,7 +122,11 @@ class BackupController extends ClientApiController
     }
 
     /**
+     * View backup
+     *
      * Returns information about a single backup.
+     *
+     * @return array<array-key, mixed>
      *
      * @throws \Illuminate\Auth\Access\AuthorizationException
      */
@@ -128,6 +142,8 @@ class BackupController extends ClientApiController
     }
 
     /**
+     * Delete backup
+     *
      * Deletes a backup from the panel as well as the remote source where it is currently
      * being stored.
      *
@@ -150,6 +166,8 @@ class BackupController extends ClientApiController
     }
 
     /**
+     * Download backup
+     *
      * Download the backup for a given server instance. For daemon local files, the file
      * will be streamed back through the Panel. For AWS S3 files, a signed URL will be generated
      * which the user is redirected to.
@@ -178,6 +196,8 @@ class BackupController extends ClientApiController
     }
 
     /**
+     * Restore backup
+     *
      * Handles restoring a backup by making a request to the daemon instance telling it
      * to begin the process of finding (or downloading) the backup and unpacking it
      * over the server files.

@@ -19,6 +19,26 @@ class EggResource extends Resource
         return static::getModel()::count() ?: null;
     }
 
+    public static function getNavigationGroup(): ?string
+    {
+        return trans('admin/dashboard.server');
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return trans('admin/egg.nav_title');
+    }
+
+    public static function getModelLabel(): string
+    {
+        return trans('admin/egg.model_label');
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return trans('admin/egg.model_label_plural');
+    }
+
     public static function getGloballySearchableAttributes(): array
     {
         return ['name', 'tags', 'uuid', 'id'];

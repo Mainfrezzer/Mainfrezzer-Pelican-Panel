@@ -2,6 +2,10 @@
 
 namespace App\Models;
 
+use App\Contracts\Validatable;
+use App\Traits\HasValidation;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,14 +14,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $id
  * @property int $user_id
  * @property int $server_id
- * @property array $permissions
+ * @property string[] $permissions
  * @property \Carbon\Carbon $created_at
  * @property \Carbon\Carbon $updated_at
  * @property \App\Models\User $user
  * @property \App\Models\Server $server
  */
-class Subuser extends Model
+class Subuser extends Model implements Validatable
 {
+    use HasFactory;
+    use HasValidation;
     use Notifiable;
 
     /**
@@ -27,20 +33,16 @@ class Subuser extends Model
     public const RESOURCE_NAME = 'server_subuser';
 
     /**
-     * The table associated with the model.
-     */
-    protected $table = 'subusers';
-
-    /**
      * Fields that are not mass assignable.
      */
     protected $guarded = ['id', 'created_at', 'updated_at'];
 
+    /** @var array<array-key, string[]> */
     public static array $validationRules = [
-        'user_id' => 'required|numeric|exists:users,id',
-        'server_id' => 'required|numeric|exists:servers,id',
-        'permissions' => 'nullable|array',
-        'permissions.*' => 'string',
+        'user_id' => ['required', 'numeric', 'exists:users,id'],
+        'server_id' => ['required', 'numeric', 'exists:servers,id'],
+        'permissions' => ['nullable', 'array'],
+        'permissions.*' => ['string'],
     ];
 
     protected function casts(): array

@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\File;
 /**
  * @property string $endpoint
  * @property string $description
- * @property array $events
+ * @property string[] $events
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property \Illuminate\Support\Carbon|null $deleted_at
@@ -21,9 +21,7 @@ class WebhookConfiguration extends Model
 {
     use HasFactory, SoftDeletes;
 
-    /**
-     * Blacklisted events.
-     */
+    /** @var string[] */
     protected static array $eventBlacklist = [
         'eloquent.created: App\Models\Webhook',
     ];
@@ -33,24 +31,6 @@ class WebhookConfiguration extends Model
         'description',
         'events',
     ];
-
-    public static function getEventClassesFromDirectory(string $directory, string $after): array
-    {
-        $events = [];
-        foreach (File::allFiles($directory) as $file) {
-            $namespace = str($file->getPath())
-                ->after($after)
-                ->replace(DIRECTORY_SEPARATOR, '\\')
-                ->after('\\')
-                ->replaceFirst('app', 'App')
-                ->toString();
-
-            $events[] = $namespace.'\\'.str($file->getFilename())
-                ->replace([DIRECTORY_SEPARATOR, '.php'], ['\\', '']);
-        }
-
-        return $events;
-    }
 
     protected function casts(): array
     {
@@ -89,16 +69,17 @@ class WebhookConfiguration extends Model
         return $this->hasMany(Webhook::class);
     }
 
+    /** @return string[] */
     public static function allPossibleEvents(): array
     {
         return collect(static::discoverCustomEvents())
             ->merge(static::allModelEvents())
-            ->merge(static::discoverFrameworkEvents())
             ->unique()
             ->filter(fn ($event) => !in_array($event, static::$eventBlacklist))
             ->all();
     }
 
+    /** @return array<string, string> */
     public static function filamentCheckboxList(): array
     {
         $list = [];
@@ -116,10 +97,10 @@ class WebhookConfiguration extends Model
             ->after('eloquent.')
             ->replace('App\\Models\\', '')
             ->replace('App\\Events\\', 'event: ')
-            ->replaceMatches('/Illuminate\\\\([A-z]+)\\\\Events\\\\/', fn (array $matches) => strtolower($matches[1]) . ': ')
             ->toString();
     }
 
+    /** @return string[] */
     public static function allModelEvents(): array
     {
         $eventTypes = ['created', 'updated', 'deleted'];
@@ -135,6 +116,7 @@ class WebhookConfiguration extends Model
         return $events;
     }
 
+    /** @return string[] */
     public static function discoverModels(): array
     {
         $namespace = 'App\\Models\\';
@@ -149,27 +131,21 @@ class WebhookConfiguration extends Model
         return $models;
     }
 
+    /** @return string[] */
     public static function discoverCustomEvents(): array
     {
         $directory = app_path('Events');
 
-        return self::getEventClassesFromDirectory($directory, base_path());
-    }
-
-    public static function discoverFrameworkEvents(): array
-    {
-        $frameworkDirectory = 'vendor/laravel/framework/src/';
-
-        $eventDirectories = [
-            'Illuminate/Auth/Events',
-            'Illuminate/Queue/Events',
-        ];
-
         $events = [];
-        foreach ($eventDirectories as $eventDirectory) {
-            $directory = base_path("$frameworkDirectory/$eventDirectory");
+        foreach (File::allFiles($directory) as $file) {
+            $namespace = str($file->getPath())
+                ->after(base_path())
+                ->replace(DIRECTORY_SEPARATOR, '\\')
+                ->replace('\\app\\', 'App\\')
+                ->toString();
 
-            $events = array_merge($events, static::getEventClassesFromDirectory($directory, $frameworkDirectory));
+            $events[] = $namespace . '\\' . str($file->getFilename())
+                ->replace([DIRECTORY_SEPARATOR, '.php'], ['\\', '']);
         }
 
         return $events;

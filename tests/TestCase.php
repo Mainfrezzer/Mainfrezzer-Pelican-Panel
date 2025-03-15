@@ -30,6 +30,7 @@ abstract class TestCase extends BaseTestCase
         // "an error occurred" message), we can probably assume that the exception isn't one that
         // is recognized as being user viewable.
         config()->set('app.debug', false);
+        config()->set('panel.auth.2fa_required', 0);
 
         $this->setKnownUuidFactory();
 
@@ -48,7 +49,7 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * Handles the known UUID handling in certain unit tests. Use the "KnownUuid" trait
+     * Handles the known UUID handling in certain unit tests. Use the "MocksUuid" trait
      * in order to enable this ability.
      */
     public function setKnownUuidFactory()

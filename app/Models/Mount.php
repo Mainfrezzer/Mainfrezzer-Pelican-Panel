@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Validation\Rules\NotIn;
+use App\Contracts\Validatable;
+use App\Traits\HasValidation;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
@@ -18,8 +20,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property \App\Models\Node[]|\Illuminate\Database\Eloquent\Collection $nodes
  * @property \App\Models\Server[]|\Illuminate\Database\Eloquent\Collection $servers
  */
-class Mount extends Model
+class Mount extends Model implements Validatable
 {
+    use HasValidation { getRules as getValidationRules; }
+
     /**
      * The resource name for this model when it is transformed into an
      * API representation using fractal.
@@ -27,37 +31,36 @@ class Mount extends Model
     public const RESOURCE_NAME = 'mount';
 
     /**
-     * The table associated with the model.
-     */
-    protected $table = 'mounts';
-
-    /**
      * Fields that are not mass assignable.
+     *
+     * @var string[]
      */
     protected $guarded = ['id'];
 
     /**
      * Rules verifying that the data being stored matches the expectations of the database.
+     *
+     * @var array<array-key, string[]>
      */
     public static array $validationRules = [
-        'name' => 'required|string|min:2|max:64|unique:mounts,name',
-        'description' => 'nullable|string|max:255',
-        'source' => 'required|string',
-        'target' => 'required|string',
-        'read_only' => 'sometimes|boolean',
-        'user_mountable' => 'sometimes|boolean',
+        'name' => ['required', 'string', 'min:2', 'max:64', 'unique:mounts,name'],
+        'description' => ['nullable', 'string', 'max:255'],
+        'source' => ['required', 'string'],
+        'target' => ['required', 'string'],
+        'read_only' => ['sometimes', 'boolean'],
+        'user_mountable' => ['sometimes', 'boolean'],
     ];
 
     /**
-     * Implement language verification by overriding Eloquence's gather
-     * rules function.
+     * Implement language verification by overriding Eloquence's gather rules function.
+     *
+     * @return array<array-key, string[]>
      */
     public static function getRules(): array
     {
-        $rules = parent::getRules();
-
-        $rules['source'][] = new NotIn(Mount::$invalidSourcePaths);
-        $rules['target'][] = new NotIn(Mount::$invalidTargetPaths);
+        $rules = self::getValidationRules();
+        $rules['source'][] = 'not_in:' . implode(',', Mount::$invalidSourcePaths);
+        $rules['target'][] = 'not_in:' . implode(',', Mount::$invalidTargetPaths);
 
         return $rules;
     }
@@ -69,6 +72,8 @@ class Mount extends Model
 
     /**
      * Blacklisted source paths.
+     *
+     * @var string[]
      */
     public static array $invalidSourcePaths = [
         '/etc/pelican',
@@ -78,6 +83,8 @@ class Mount extends Model
 
     /**
      * Blacklisted target paths.
+     *
+     * @var string[]
      */
     public static array $invalidTargetPaths = [
         '/home/container',
@@ -114,10 +121,5 @@ class Mount extends Model
     public function servers(): BelongsToMany
     {
         return $this->belongsToMany(Server::class);
-    }
-
-    public function getRouteKeyName(): string
-    {
-        return 'id';
     }
 }

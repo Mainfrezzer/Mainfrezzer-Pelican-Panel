@@ -6,15 +6,15 @@ use App\Models\User;
 use App\Models\Subuser;
 use App\Repositories\Daemon\DaemonServerRepository;
 use App\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class SubuserAuthorizationTest extends ClientApiIntegrationTestCase
 {
     /**
      * Test that mismatched subusers are not accessible to a server.
-     *
-     * @dataProvider methodDataProvider
      */
-    public function testUserCannotAccessResourceBelongingToOtherServers(string $method): void
+    #[DataProvider('methodDataProvider')]
+    public function test_user_cannot_access_resource_belonging_to_other_servers(string $method): void
     {
         // Generic subuser, the specific resource we're trying to access.
         /** @var \App\Models\User $internal */

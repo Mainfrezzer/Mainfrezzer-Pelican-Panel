@@ -7,13 +7,12 @@ use App\Models\Backup;
 use App\Models\Subuser;
 use App\Services\Backups\DeleteBackupService;
 use App\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class BackupAuthorizationTest extends ClientApiIntegrationTestCase
 {
-    /**
-     * @dataProvider methodDataProvider
-     */
-    public function testAccessToAServersBackupIsRestrictedProperly(string $method, string $endpoint): void
+    #[DataProvider('methodDataProvider')]
+    public function test_access_to_a_servers_backup_is_restricted_properly(string $method, string $endpoint): void
     {
         // The API $user is the owner of $server1.
         [$user, $server1] = $this->generateTestAccount();

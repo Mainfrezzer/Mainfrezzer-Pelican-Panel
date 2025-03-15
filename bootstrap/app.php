@@ -10,7 +10,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        $middleware->redirectGuestsTo(fn () => route('auth.login'));
+        $middleware->redirectGuestsTo(fn () => route('filament.app.auth.login'));
 
         $middleware->web(\App\Http\Middleware\LanguageMiddleware::class);
 
@@ -44,7 +44,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'bindings' => \Illuminate\Routing\Middleware\SubstituteBindings::class,
             'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
             'node.maintenance' => \App\Http\Middleware\MaintenanceMiddleware::class,
-            'recaptcha' => \App\Http\Middleware\VerifyReCaptcha::class,
+            'captcha' => \App\Http\Middleware\VerifyCaptcha::class,
         ]);
     })
     ->withSingletons([

@@ -3,10 +3,12 @@
 namespace App\Filament\Pages\Auth;
 
 use App\Exceptions\Service\User\TwoFactorAuthenticationTokenInvalid;
+use App\Extensions\OAuth\Providers\OAuthProvider;
 use App\Facades\Activity;
 use App\Models\ActivityLog;
 use App\Models\ApiKey;
 use App\Models\User;
+use App\Services\Helpers\LanguageService;
 use App\Services\Users\ToggleTwoFactorService;
 use App\Services\Users\TwoFactorSetupService;
 use App\Services\Users\UserUpdateService;
@@ -30,13 +32,13 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Get;
 use Filament\Notifications\Notification;
 use Filament\Pages\Auth\EditProfile as BaseEditProfile;
+use Filament\Support\Colors\Color;
 use Filament\Support\Enums\MaxWidth;
 use Filament\Support\Exceptions\Halt;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\HtmlString;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Socialite\Facades\Socialite;
 
@@ -59,18 +61,19 @@ class EditProfile extends BaseEditProfile
 
     protected function getForms(): array
     {
+        $oauthProviders = collect(OAuthProvider::get())->filter(fn (OAuthProvider $provider) => $provider->isEnabled())->all();
+
         return [
             'form' => $this->form(
                 $this->makeForm()
                     ->schema([
                         Tabs::make()->persistTabInQueryString()
                             ->schema([
-                                Tab::make('Account')
-                                    ->label(trans('strings.account'))
+                                Tab::make(trans('profile.tabs.account'))
                                     ->icon('tabler-user')
                                     ->schema([
                                         TextInput::make('username')
-                                            ->label(trans('strings.username'))
+                                            ->label(trans('profile.username'))
                                             ->disabled()
                                             ->readOnly()
                                             ->dehydrated(false)
@@ -79,13 +82,13 @@ class EditProfile extends BaseEditProfile
                                             ->autofocus(),
                                         TextInput::make('email')
                                             ->prefixIcon('tabler-mail')
-                                            ->label(trans('strings.email'))
+                                            ->label(trans('profile.email'))
                                             ->email()
                                             ->required()
                                             ->maxLength(255)
                                             ->unique(ignoreRecord: true),
                                         TextInput::make('password')
-                                            ->label(trans('strings.password'))
+                                            ->label(trans('profile.password'))
                                             ->password()
                                             ->prefixIcon('tabler-password')
                                             ->revealable(filament()->arePasswordsRevealable())
@@ -96,7 +99,7 @@ class EditProfile extends BaseEditProfile
                                             ->live(debounce: 500)
                                             ->same('passwordConfirmation'),
                                         TextInput::make('passwordConfirmation')
-                                            ->label(trans('strings.password_confirmation'))
+                                            ->label(trans('profile.password_confirmation'))
                                             ->password()
                                             ->prefixIcon('tabler-password-fingerprint')
                                             ->revealable(filament()->arePasswordsRevealable())
@@ -104,90 +107,83 @@ class EditProfile extends BaseEditProfile
                                             ->visible(fn (Get $get): bool => filled($get('password')))
                                             ->dehydrated(false),
                                         Select::make('timezone')
+                                            ->label(trans('profile.timezone'))
                                             ->required()
                                             ->prefixIcon('tabler-clock-pin')
+                                            ->default('UTC')
+                                            ->selectablePlaceholder(false)
                                             ->options(fn () => collect(DateTimeZone::listIdentifiers())->mapWithKeys(fn ($tz) => [$tz => $tz]))
-                                            ->searchable(),
+                                            ->searchable()
+                                            ->native(false),
                                         Select::make('language')
-                                            ->label(trans('strings.language'))
+                                            ->label(trans('profile.language'))
                                             ->required()
                                             ->prefixIcon('tabler-flag')
                                             ->live()
                                             ->default('en')
-                                            ->helperText(fn (User $user, $state) => new HtmlString($user->isLanguageTranslated($state) ? '' : "
-                                                Your language ($state) has not been translated yet!
-                                                But never fear, you can help fix that by
-                                                <a style='color: rgb(56, 189, 248)' href='https://crowdin.com/project/pelican-dev'>contributing directly here</a>.
-                                            ")
-                                            )
-                                            ->options(fn (User $user) => $user->getAvailableLanguages()),
+                                            ->selectablePlaceholder(false)
+                                            ->helperText(fn ($state, LanguageService $languageService) => new HtmlString($languageService->isLanguageTranslated($state) ? '' : trans('profile.language_help', ['state' => $state])))
+                                            ->options(fn (LanguageService $languageService) => $languageService->getAvailableLanguages())
+                                            ->native(false),
                                     ]),
 
-                                Tab::make('OAuth')
+                                Tab::make(trans('profile.tabs.oauth'))
                                     ->icon('tabler-brand-oauth')
-                                    ->visible(function () {
-                                        foreach (config('auth.oauth') as $name => $data) {
-                                            if ($data['enabled']) {
-                                                return true;
-                                            }
-                                        }
+                                    ->visible(count($oauthProviders) > 0)
+                                    ->schema(function () use ($oauthProviders) {
+                                        $actions = [];
 
-                                        return false;
-                                    })
-                                    ->schema(function () {
-                                        $providers = [];
+                                        foreach ($oauthProviders as $oauthProvider) {
 
-                                        foreach (config('auth.oauth') as $name => $data) {
-                                            if (!$data['enabled']) {
-                                                continue;
-                                            }
+                                            $id = $oauthProvider->getId();
+                                            $name = $oauthProvider->getName();
 
-                                            $unlink = array_key_exists($name, $this->getUser()->oauth ?? []);
+                                            $unlink = array_key_exists($id, $this->getUser()->oauth ?? []);
 
-                                            $providers[] = Action::make("oauth_$name")
-                                                ->label(($unlink ? 'Unlink ' : 'Link ') . Str::title($name))
+                                            $actions[] = Action::make("oauth_$id")
+                                                ->label(($unlink ? trans('profile.unlink') : trans('profile.link')) . $name)
                                                 ->icon($unlink ? 'tabler-unlink' : 'tabler-link')
-                                                ->color($data['color'])
-                                                ->action(function (UserUpdateService $updateService) use ($name, $unlink) {
+                                                ->color(Color::hex($oauthProvider->getHexColor()))
+                                                ->action(function (UserUpdateService $updateService) use ($id, $name, $unlink) {
                                                     if ($unlink) {
                                                         $oauth = auth()->user()->oauth;
-                                                        unset($oauth[$name]);
+                                                        unset($oauth[$id]);
 
                                                         $updateService->handle(auth()->user(), ['oauth' => $oauth]);
 
                                                         $this->fillForm();
 
                                                         Notification::make()
-                                                            ->title("OAuth provider '$name' unlinked")
+                                                            ->title(trans('profile.unlinked', ['name' => $name]))
                                                             ->success()
                                                             ->send();
-                                                    } elseif (config("auth.oauth.$name.enabled")) {
-                                                        redirect(Socialite::with($name)->redirect()->getTargetUrl());
+                                                    } else {
+                                                        redirect(Socialite::with($id)->redirect()->getTargetUrl());
                                                     }
                                                 });
                                         }
 
-                                        return [Actions::make($providers)];
+                                        return [Actions::make($actions)];
                                     }),
 
-                                Tab::make('2FA')
+                                Tab::make(trans('profile.tabs.2fa'))
                                     ->icon('tabler-shield-lock')
                                     ->schema(function (TwoFactorSetupService $setupService) {
                                         if ($this->getUser()->use_totp) {
                                             return [
                                                 Placeholder::make('2fa-already-enabled')
-                                                    ->label('Two Factor Authentication is currently enabled!'),
+                                                    ->label(trans('profile.2fa_enabled')),
                                                 Textarea::make('backup-tokens')
                                                     ->hidden(fn () => !cache()->get("users.{$this->getUser()->id}.2fa.tokens"))
                                                     ->rows(10)
                                                     ->readOnly()
                                                     ->dehydrated(false)
                                                     ->formatStateUsing(fn () => cache()->get("users.{$this->getUser()->id}.2fa.tokens"))
-                                                    ->helperText('These will not be shown again!')
-                                                    ->label('Backup Tokens:'),
+                                                    ->helperText(trans('profile.backup_help'))
+                                                    ->label(trans('profile.backup_codes')),
                                                 TextInput::make('2fa-disable-code')
-                                                    ->label('Disable 2FA')
-                                                    ->helperText('Enter your current 2FA code to disable Two Factor Authentication'),
+                                                    ->label(trans('profile.disable_2fa'))
+                                                    ->helperText(trans('profile.disable_2fa_help')),
                                             ];
                                         }
 
@@ -202,75 +198,68 @@ class EditProfile extends BaseEditProfile
                                             'addLogoSpace' => true,
                                             'logoSpaceWidth' => 13,
                                             'logoSpaceHeight' => 13,
+                                            'version' => Version::AUTO,
+                                            // 'outputInterface' => QRSvgWithLogo::class,
+                                            'outputBase64' => false,
+                                            'eccLevel' => EccLevel::H, // ECC level H is necessary when using logos
+                                            'addQuietzone' => true,
+                                            // 'drawLightModules' => true,
+                                            'connectPaths' => true,
+                                            'drawCircularModules' => true,
+                                            // 'circleRadius' => 0.45,
+                                            'svgDefs' => '
+                                                <linearGradient id="gradient" x1="100%" y2="100%">
+                                                    <stop stop-color="#7dd4fc" offset="0"/>
+                                                    <stop stop-color="#38bdf8" offset="0.5"/>
+                                                    <stop stop-color="#0369a1" offset="1"/>
+                                                </linearGradient>
+                                                <style><![CDATA[
+                                                    .dark{fill: url(#gradient);}
+                                                    .light{fill: #000;}
+                                                ]]></style>
+                                            ',
                                         ]);
 
                                         // https://github.com/chillerlan/php-qrcode/blob/main/examples/svgWithLogo.php
-
-                                        // QROptions
-                                        // @phpstan-ignore property.protected
-                                        $options->version = Version::AUTO;
-                                        // $options->outputInterface     = QRSvgWithLogo::class;
-                                        // @phpstan-ignore property.protected
-                                        $options->outputBase64 = false;
-                                        // @phpstan-ignore property.protected
-                                        $options->eccLevel = EccLevel::H; // ECC level H is necessary when using logos
-                                        // @phpstan-ignore property.protected
-                                        $options->addQuietzone = true;
-                                        // $options->drawLightModules    = true;
-                                        // @phpstan-ignore property.protected
-                                        $options->connectPaths = true;
-                                        // @phpstan-ignore property.protected
-                                        $options->drawCircularModules = true;
-                                        // $options->circleRadius        = 0.45;
-
-                                        // @phpstan-ignore property.protected
-                                        $options->svgDefs = '<linearGradient id="gradient" x1="100%" y2="100%">
-                                            <stop stop-color="#7dd4fc" offset="0"/>
-                                            <stop stop-color="#38bdf8" offset="0.5"/>
-                                            <stop stop-color="#0369a1" offset="1"/>
-                                        </linearGradient>
-                                        <style><![CDATA[
-                                            .dark{fill: url(#gradient);}
-                                            .light{fill: #000;}
-                                        ]]></style>';
 
                                         $image = (new QRCode($options))->render($url);
 
                                         return [
                                             Placeholder::make('qr')
-                                                ->label('Scan QR Code')
+                                                ->label(trans('profile.scan_qr'))
                                                 ->content(fn () => new HtmlString("
                                                 <div style='width: 300px; background-color: rgb(24, 24, 27);'>$image</div>
                                             "))
-                                                ->helperText('Setup Key: ' . $secret),
+                                                ->helperText(trans('profile.setup_key') .': '. $secret),
                                             TextInput::make('2facode')
-                                                ->label('Code')
+                                                ->label(trans('profile.code'))
                                                 ->requiredWith('2fapassword')
-                                                ->helperText('Scan the QR code above using your two-step authentication app, then enter the code generated.'),
+                                                ->helperText(trans('profile.code_help')),
                                             TextInput::make('2fapassword')
-                                                ->label('Current Password')
+                                                ->label(trans('profile.current_password'))
                                                 ->requiredWith('2facode')
                                                 ->currentPassword()
-                                                ->password()
-                                                ->helperText('Enter your current password to verify.'),
+                                                ->password(),
                                         ];
                                     }),
-                                Tab::make('API Keys')
+                                Tab::make(trans('profile.tabs.api_keys'))
                                     ->icon('tabler-key')
                                     ->schema([
-                                        Grid::make('asdf')->columns(5)->schema([
-                                            Section::make('Create API Key')->columnSpan(3)->schema([
+                                        Grid::make('name')->columns(5)->schema([
+                                            Section::make(trans('profile.create_key'))->columnSpan(3)->schema([
                                                 TextInput::make('description')
+                                                    ->label(trans('profile.description'))
                                                     ->live(),
                                                 TagsInput::make('allowed_ips')
+                                                    ->label(trans('profile.allowed_ips'))
                                                     ->live()
                                                     ->splitKeys([',', ' ', 'Tab'])
-                                                    ->placeholder('Example: 127.0.0.1 or 192.168.1.1')
-                                                    ->label('Whitelisted IP\'s')
-                                                    ->helperText('Press enter to add a new IP address or leave blank to allow any IP address')
+                                                    ->placeholder('127.0.0.1 or 192.168.1.1')
+                                                    ->helperText(trans('profile.allowed_ips_help'))
                                                     ->columnSpanFull(),
                                             ])->headerActions([
                                                 Action::make('Create')
+                                                    ->label(trans('filament-actions::create.single.modal.actions.create.label'))
                                                     ->disabled(fn (Get $get) => $get('description') === null)
                                                     ->successRedirectUrl(self::getUrl(['tab' => '-api-keys-tab']))
                                                     ->action(function (Get $get, Action $action, User $user) {
@@ -285,7 +274,7 @@ class EditProfile extends BaseEditProfile
                                                             ->log();
 
                                                         Notification::make()
-                                                            ->title('API Key created')
+                                                            ->title(trans('profile.key_created'))
                                                             ->body($token->accessToken->identifier . $token->plainTextToken)
                                                             ->persistent()
                                                             ->success()
@@ -294,7 +283,7 @@ class EditProfile extends BaseEditProfile
                                                         $action->success();
                                                     }),
                                             ]),
-                                            Section::make('Keys')->columnSpan(2)->schema([
+                                            Section::make(trans('profile.keys'))->label(trans('profile.keys'))->columnSpan(2)->schema([
                                                 Repeater::make('keys')
                                                     ->label('')
                                                     ->relationship('apiKeys')
@@ -319,15 +308,14 @@ class EditProfile extends BaseEditProfile
                                             ]),
                                         ]),
                                     ]),
-                                Tab::make('SSH Keys')
+                                Tab::make(trans('profile.tabs.ssh_keys'))
                                     ->icon('tabler-lock-code')
-                                    ->schema([
-                                        Placeholder::make('Coming soon!'),
-                                    ]),
-                                Tab::make('Activity')
+                                    ->hidden(),
+                                Tab::make(trans('profile.tabs.activity'))
                                     ->icon('tabler-history')
                                     ->schema([
                                         Repeater::make('activity')
+                                            ->label('')
                                             ->deletable(false)
                                             ->addable(false)
                                             ->relationship(null, function (Builder $query) {
@@ -365,7 +353,7 @@ class EditProfile extends BaseEditProfile
                 $this->toggleTwoFactorService->handle($record, $token, false);
             } catch (TwoFactorAuthenticationTokenInvalid $exception) {
                 Notification::make()
-                    ->title('Invalid 2FA Code')
+                    ->title(trans('profile.invalid_code'))
                     ->body($exception->getMessage())
                     ->color('danger')
                     ->icon('tabler-2fa')

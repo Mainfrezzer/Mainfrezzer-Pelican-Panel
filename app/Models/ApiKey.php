@@ -3,7 +3,10 @@
 namespace App\Models;
 
 use App\Services\Acl\Api\AdminAcl;
+use App\Traits\HasValidation;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\PersonalAccessToken;
 use Webmozart\Assert\Assert;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -15,8 +18,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $key_type
  * @property string $identifier
  * @property string $token
- * @property array $permissions
- * @property array $allowed_ips
+ * @property string[]|null $permissions
+ * @property string[]|null $allowed_ips
  * @property string|null $memo
  * @property \Illuminate\Support\Carbon|null $last_used_at
  * @property \Illuminate\Support\Carbon|null $expires_at
@@ -47,8 +50,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @method static \Illuminate\Database\Eloquent\Builder|ApiKey whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|ApiKey whereUserId($value)
  */
-class ApiKey extends Model
+class ApiKey extends PersonalAccessToken
 {
+    use HasFactory;
+    use HasValidation;
+
     /**
      * The resource name for this model when it is transformed into an
      * API representation using fractal.
@@ -74,11 +80,6 @@ class ApiKey extends Model
      * in the database.
      */
     public const KEY_LENGTH = 32;
-
-    /**
-     * The table associated with the model.
-     */
-    protected $table = 'api_keys';
 
     /**
      * Fields that are mass assignable.
@@ -109,21 +110,19 @@ class ApiKey extends Model
      */
     protected $hidden = ['token'];
 
-    /**
-     * Rules to protect against invalid data entry to DB.
-     */
+    /** @var array<array-key, string[]> */
     public static array $validationRules = [
-        'user_id' => 'required|exists:users,id',
-        'key_type' => 'present|integer|min:0|max:2',
-        'identifier' => 'required|string|size:16|unique:api_keys,identifier',
-        'token' => 'required|string',
-        'permissions' => 'array',
-        'permissions.*' => 'integer|min:0|max:3',
-        'memo' => 'required|nullable|string|max:500',
-        'allowed_ips' => 'array',
-        'allowed_ips.*' => 'string',
-        'last_used_at' => 'nullable|date',
-        'expires_at' => 'nullable|date',
+        'user_id' => ['required', 'exists:users,id'],
+        'key_type' => ['present', 'integer', 'min:0', 'max:2'],
+        'identifier' => ['required', 'string', 'size:16', 'unique:api_keys,identifier'],
+        'token' => ['required', 'string'],
+        'permissions' => ['array'],
+        'permissions.*' => ['integer', 'min:0', 'max:3'],
+        'memo' => ['required', 'nullable', 'string', 'max:500'],
+        'allowed_ips' => ['array'],
+        'allowed_ips.*' => ['string'],
+        'last_used_at' => ['nullable', 'date'],
+        'expires_at' => ['nullable', 'date'],
     ];
 
     protected function casts(): array
@@ -148,13 +147,9 @@ class ApiKey extends Model
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * Required for support with Laravel Sanctum.
-     *
-     * @see \Laravel\Sanctum\Guard::supportsTokens()
-     */
-    public function tokenable(): BelongsTo
+    public function tokenable()
     {
+        // @phpstan-ignore return.type
         return $this->user();
     }
 
@@ -178,15 +173,18 @@ class ApiKey extends Model
         Role::RESOURCE_NAME,
     ];
 
-    private static array $customResourceNames = [];
+    /** @var string[] */
+    protected static array $customResourceNames = [];
 
     public static function registerCustomResourceName(string $resourceName): void
     {
-        $customResourceNames[] = $resourceName;
+        static::$customResourceNames[] = $resourceName;
     }
 
     /**
      * Returns a list of all possible permission keys.
+     *
+     * @return string[]
      */
     public static function getPermissionList(): array
     {
@@ -195,11 +193,14 @@ class ApiKey extends Model
 
     /**
      * Finds the model matching the provided token.
+     *
+     * @param  string  $token
      */
-    public static function findToken(string $token): ?self
+    public static function findToken($token): ?self
     {
         $identifier = substr($token, 0, self::IDENTIFIER_LENGTH);
 
+        /** @var static|null $model */
         $model = static::where('identifier', $identifier)->first();
         if (!is_null($model) && $model->token === substr($token, strlen($identifier))) {
             return $model;

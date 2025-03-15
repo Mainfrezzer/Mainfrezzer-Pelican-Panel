@@ -10,6 +10,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\UserSSHKey;
 use App\Tests\Integration\IntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class SftpAuthenticationControllerTest extends IntegrationTestCase
 {
@@ -37,7 +38,7 @@ class SftpAuthenticationControllerTest extends IntegrationTestCase
     /**
      * Test that a public key is validated correctly.
      */
-    public function testPublicKeyIsValidatedCorrectly(): void
+    public function test_public_key_is_validated_correctly(): void
     {
         $key = UserSSHKey::factory()->for($this->user)->create();
 
@@ -67,7 +68,7 @@ class SftpAuthenticationControllerTest extends IntegrationTestCase
     /**
      * Test that an account password is validated correctly.
      */
-    public function testPasswordIsValidatedCorrectly(): void
+    public function test_password_is_validated_correctly(): void
     {
         $this->postJson('/api/remote/sftp/auth', [
             'username' => $this->getUsername(),
@@ -95,10 +96,9 @@ class SftpAuthenticationControllerTest extends IntegrationTestCase
     /**
      * Test that providing an invalid key and/or invalid username triggers the throttle on
      * the endpoint.
-     *
-     * @dataProvider authorizationTypeDataProvider
      */
-    public function testUserIsThrottledIfInvalidCredentialsAreProvided(): void
+    #[DataProvider('authorizationTypeDataProvider')]
+    public function test_user_is_throttled_if_invalid_credentials_are_provided(): void
     {
         for ($i = 0; $i <= 10; $i++) {
             $this->postJson('/api/remote/sftp/auth', [
@@ -113,10 +113,9 @@ class SftpAuthenticationControllerTest extends IntegrationTestCase
     /**
      * Test that a request is rejected if the credentials are valid but the username indicates
      * a server on a different node.
-     *
-     * @dataProvider authorizationTypeDataProvider
      */
-    public function testRequestIsRejectedIfServerBelongsToDifferentNode(string $type): void
+    #[DataProvider('authorizationTypeDataProvider')]
+    public function test_request_is_rejected_if_server_belongs_to_different_node(string $type): void
     {
         $node2 = $this->createServerModel()->node;
 
@@ -134,7 +133,7 @@ class SftpAuthenticationControllerTest extends IntegrationTestCase
             ->assertForbidden();
     }
 
-    public function testRequestIsDeniedIfUserLacksSftpPermission(): void
+    public function test_request_is_denied_if_user_lacks_sftp_permission(): void
     {
         [$user, $server] = $this->generateTestAccount([Permission::ACTION_FILE_READ]);
 
@@ -150,10 +149,8 @@ class SftpAuthenticationControllerTest extends IntegrationTestCase
             ->assertJsonPath('errors.0.detail', 'You do not have permission to access SFTP for this server.');
     }
 
-    /**
-     * @dataProvider serverStateDataProvider
-     */
-    public function testInvalidServerStateReturnsConflictError(string $status): void
+    #[DataProvider('serverStateDataProvider')]
+    public function test_invalid_server_state_returns_conflict_error(string $status): void
     {
         $this->server->update(['status' => $status]);
 
@@ -164,7 +161,7 @@ class SftpAuthenticationControllerTest extends IntegrationTestCase
     /**
      * Test that permissions are returned for the user account correctly.
      */
-    public function testUserPermissionsAreReturnedCorrectly(): void
+    public function test_user_permissions_are_returned_correctly(): void
     {
         [$user, $server] = $this->generateTestAccount([Permission::ACTION_FILE_READ, Permission::ACTION_FILE_SFTP]);
 

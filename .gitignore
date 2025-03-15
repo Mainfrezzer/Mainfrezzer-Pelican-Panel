@@ -4,6 +4,7 @@
 /public/hot
 /public/storage
 /storage/*.key
+/storage/pail
 /storage/clockwork/*
 /vendor
 *.DS_Store*
@@ -19,10 +20,12 @@ npm-debug.log
 yarn-error.log
 /.fleet
 /.idea
+/.nova
 /.vscode
 
 public/assets/manifest.json
 /database/*.sqlite
+/database/*.sqlite-journal
 filament-monaco-editor/
 _ide_helper*
 /.phpstorm.meta.php

@@ -36,6 +36,7 @@ class PanelInstaller extends SimplePage implements HasForms
     use EnvironmentWriterTrait;
     use InteractsWithForms;
 
+    /** @var array<mixed> */
     public array $data = [];
 
     protected static string $view = 'filament.pages.installer';
@@ -47,8 +48,7 @@ class PanelInstaller extends SimplePage implements HasForms
 
     public static function isInstalled(): bool
     {
-        // This defaults to true so existing panels count as "installed"
-        return env('APP_INSTALLED', true);
+        return config('app.installed');
     }
 
     public function mount(): void

@@ -8,23 +8,22 @@ use Illuminate\Http\Request;
 use Webmozart\Assert\Assert;
 use App\Models\ApiKey;
 use Illuminate\Container\Container;
-use Illuminate\Database\Eloquent\Model;
 use League\Fractal\TransformerAbstract;
 use App\Services\Acl\Api\AdminAcl;
 
-/**
- * @method array transform(Model $model)
- */
 abstract class BaseTransformer extends TransformerAbstract
 {
     public const RESPONSE_TIMEZONE = 'UTC';
 
     protected Request $request;
 
-    /**
-     * BaseTransformer constructor.
-     */
-    public function __construct()
+    /** @var string[] */
+    protected array $availableIncludes = [];
+
+    /** @var string[] */
+    protected array $defaultIncludes = [];
+
+    final public function __construct()
     {
         // Transformers allow for dependency injection on the handle method.
         if (method_exists($this, 'handle')) {
@@ -38,9 +37,16 @@ abstract class BaseTransformer extends TransformerAbstract
     abstract public function getResourceName(): string;
 
     /**
+     * @return array<string, mixed>
+     *
+     * Transforms a Model into a representation that can be shown to regular users of the API.
+     */
+    abstract public function transform($model): array; // @phpstan-ignore missingType.parameter
+
+    /**
      * Sets the request on the instance.
      */
-    public function setRequest(Request $request): self
+    public function setRequest(Request $request): static
     {
         $this->request = $request;
 
@@ -49,21 +55,16 @@ abstract class BaseTransformer extends TransformerAbstract
 
     /**
      * Returns a new transformer instance with the request set on the instance.
-     *
-     * @return static
      */
-    public static function fromRequest(Request $request): self
+    public static function fromRequest(Request $request): static
     {
-        // @phpstan-ignore-next-line
-        return app(static::class)->setRequest($request);
+        return (new static())->setRequest($request);
     }
 
     /**
      * Determine if the API key loaded onto the transformer has permission
      * to access a different resource. This is used when including other
      * models on a transformation request.
-     *
-     * @deprecated — prefer $user->can/cannot methods
      */
     protected function authorize(string $resource): bool
     {

@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Api\Client;
 
 use App\Models\Server;
 use App\Models\Permission;
+use Illuminate\Support\Collection;
 use Spatie\QueryBuilder\QueryBuilder;
 use Spatie\QueryBuilder\AllowedFilter;
 use App\Models\Filters\MultiFieldServerFilter;
 use App\Transformers\Api\Client\ServerTransformer;
 use App\Http\Requests\Api\Client\GetServersRequest;
+use Dedoc\Scramble\Attributes\Group;
 
+#[Group('Base')]
 class ClientController extends ClientApiController
 {
     /**
@@ -21,8 +24,12 @@ class ClientController extends ClientApiController
     }
 
     /**
+     * List servers
+     *
      * Return all the servers available to the client making the API
      * request, including servers the user has access to as a subuser.
+     *
+     * @return array<array-key, mixed>
      */
     public function index(GetServersRequest $request): array
     {
@@ -53,12 +60,12 @@ class ClientController extends ClientApiController
             } else {
                 $builder = $type === 'admin-all'
                     ? $builder
-                    : $builder->whereNotIn('servers.id', $user->accessibleServers()->pluck('id')->all());
+                    : $builder->whereNotIn('servers.id', $user->directAccessibleServers()->pluck('id')->all());
             }
         } elseif ($type === 'owner') {
             $builder = $builder->where('servers.owner_id', $user->id);
         } else {
-            $builder = $builder->whereIn('servers.id', $user->accessibleServers()->pluck('id')->all());
+            $builder = $builder->whereIn('servers.id', $user->directAccessibleServers()->pluck('id')->all());
         }
 
         $servers = $builder->paginate(min($request->query('per_page', '50'), 100))->appends($request->query());
@@ -67,7 +74,11 @@ class ClientController extends ClientApiController
     }
 
     /**
+     * List subuser permissions
+     *
      * Returns all the subuser permissions available on the system.
+     *
+     * @return array{object: string, attributes: array{permissions: Collection}}
      */
     public function permissions(): array
     {

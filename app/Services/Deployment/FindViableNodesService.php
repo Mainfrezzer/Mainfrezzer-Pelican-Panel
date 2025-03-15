@@ -16,6 +16,8 @@ class FindViableNodesService
      * and cpu availability requirements. Any nodes not meeting those requirements
      * are tossed out, as are any nodes marked as non-public, meaning automatic
      * deployments should not be done against them.
+     *
+     * @param  string[]  $tags
      */
     public function handle(int $memory = 0, int $disk = 0, int $cpu = 0, array $tags = []): Collection
     {
@@ -27,7 +29,7 @@ class FindViableNodesService
             ->get();
 
         return $nodes
-            ->filter(fn (Node $node) => !$tags || collect($node->tags)->intersect($tags))
+            ->filter(fn (Node $node) => !$tags || collect($node->tags)->intersect($tags)->isNotEmpty())
             ->filter(fn (Node $node) => $node->isViable($memory, $disk, $cpu));
     }
 }

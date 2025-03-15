@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Contracts\Validatable;
 use App\Enums\ContainerStatus;
 use App\Enums\ServerResourceType;
 use App\Enums\ServerState;
 use App\Repositories\Daemon\DaemonServerRepository;
+use App\Traits\HasValidation;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Notifications\Notifiable;
@@ -108,9 +112,9 @@ use App\Services\Subusers\SubuserDeletionService;
  * @method static \Illuminate\Database\Eloquent\Builder|Server whereUuid($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Server whereuuid_short($value)
  *
- * @property array|null $docker_labels
+ * @property string[]|null $docker_labels
  * @property string|null $ports
- * @property-read mixed $condition
+ * @property-read ContainerStatus|ServerState $condition
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\EggVariable> $eggVariables
  * @property-read int|null $egg_variables_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ServerVariable> $serverVariables
@@ -121,8 +125,10 @@ use App\Services\Subusers\SubuserDeletionService;
  * @method static \Illuminate\Database\Eloquent\Builder|Server wherePorts($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Server whereUuidShort($value)
  */
-class Server extends Model
+class Server extends Model implements Validatable
 {
+    use HasFactory;
+    use HasValidation;
     use Notifiable;
 
     /**
@@ -130,11 +136,6 @@ class Server extends Model
      * API representation using fractal. Also used as name for api key permissions.
      */
     public const RESOURCE_NAME = 'server';
-
-    /**
-     * The table associated with the model.
-     */
-    protected $table = 'servers';
 
     /**
      * Default values when creating the model. We want to switch to disabling OOM killer
@@ -154,30 +155,31 @@ class Server extends Model
     /**
      * Fields that are not mass assignable.
      */
-    protected $guarded = ['id', self::CREATED_AT, self::UPDATED_AT, 'deleted_at', 'installed_at'];
+    protected $guarded = ['id', self::CREATED_AT, self::UPDATED_AT, 'installed_at'];
 
+    /** @var array<array-key, string[]> */
     public static array $validationRules = [
-        'external_id' => 'sometimes|nullable|string|between:1,255|unique:servers',
-        'owner_id' => 'required|integer|exists:users,id',
-        'name' => 'required|string|min:1|max:255',
-        'node_id' => 'required|exists:nodes,id',
-        'description' => 'string',
-        'status' => 'nullable|string',
-        'memory' => 'required|numeric|min:0',
-        'swap' => 'required|numeric|min:-1',
-        'io' => 'required|numeric|between:0,1000',
-        'cpu' => 'required|numeric|min:0',
-        'threads' => 'nullable|regex:/^[0-9-,]+$/',
-        'oom_killer' => 'sometimes|boolean',
-        'disk' => 'required|numeric|min:0',
-        'allocation_id' => 'required|bail|unique:servers|exists:allocations,id',
-        'egg_id' => 'required|exists:eggs,id',
-        'startup' => 'required|string',
-        'skip_scripts' => 'sometimes|boolean',
-        'image' => 'required|string|max:255',
-        'database_limit' => 'present|nullable|integer|min:0',
-        'allocation_limit' => 'sometimes|nullable|integer|min:0',
-        'backup_limit' => 'present|nullable|integer|min:0',
+        'external_id' => ['sometimes', 'nullable', 'string', 'between:1,255', 'unique:servers'],
+        'owner_id' => ['required', 'integer', 'exists:users,id'],
+        'name' => ['required', 'string', 'min:1', 'max:255'],
+        'node_id' => ['required', 'exists:nodes,id'],
+        'description' => ['string'],
+        'status' => ['nullable', 'string'],
+        'memory' => ['required', 'numeric', 'min:0'],
+        'swap' => ['required', 'numeric', 'min:-1'],
+        'io' => ['required', 'numeric', 'between:0,1000'],
+        'cpu' => ['required', 'numeric', 'min:0'],
+        'threads' => ['nullable', 'regex:/^[0-9-,]+$/'],
+        'oom_killer' => ['sometimes', 'boolean'],
+        'disk' => ['required', 'numeric', 'min:0'],
+        'allocation_id' => ['required', 'bail', 'unique:servers', 'exists:allocations,id'],
+        'egg_id' => ['required', 'exists:eggs,id'],
+        'startup' => ['required', 'string'],
+        'skip_scripts' => ['sometimes', 'boolean'],
+        'image' => ['required', 'string', 'max:255'],
+        'database_limit' => ['present', 'nullable', 'integer', 'min:0'],
+        'allocation_limit' => ['sometimes', 'nullable', 'integer', 'min:0'],
+        'backup_limit' => ['present', 'nullable', 'integer', 'min:0'],
     ];
 
     protected function casts(): array
@@ -200,7 +202,6 @@ class Server extends Model
             'backup_limit' => 'integer',
             self::CREATED_AT => 'datetime',
             self::UPDATED_AT => 'datetime',
-            'deleted_at' => 'datetime',
             'installed_at' => 'datetime',
             'docker_labels' => 'array',
         ];
@@ -211,7 +212,7 @@ class Server extends Model
         static::saved(function (self $server) {
             $subuser = $server->subusers()->where('user_id', $server->owner_id)->first();
             if ($subuser) {
-                // @phpstan-ignore-next-line
+                // @phpstan-ignore myCustomRules.forbiddenGlobalFunctions
                 app(SubuserDeletionService::class)->handle($subuser, $server);
             }
         });
@@ -219,6 +220,8 @@ class Server extends Model
 
     /**
      * Returns the format for server allocations when communicating with the Daemon.
+     *
+     * @return array<int>
      */
     public function getAllocationMappings(): array
     {
@@ -247,6 +250,8 @@ class Server extends Model
 
     /**
      * Gets the subusers associated with a server.
+     *
+     * @return HasMany<Subuser, $this>
      */
     public function subusers(): HasMany
     {
@@ -284,6 +289,8 @@ class Server extends Model
 
     /**
      * Gets information for the egg variables associated with this server.
+     *
+     * @return HasMany<EggVariable, $this>
      */
     public function variables(): HasMany
     {
@@ -303,6 +310,7 @@ class Server extends Model
         return $this->hasMany(ServerVariable::class);
     }
 
+    /** @deprecated use serverVariables */
     public function viewableServerVariables(): HasMany
     {
         return $this->serverVariables()
@@ -342,6 +350,9 @@ class Server extends Model
         return $this->hasOne(ServerTransfer::class)->whereNull('successful')->orderByDesc('id');
     }
 
+    /**
+     * @return HasMany<Backup, $this>
+     */
     public function backups(): HasMany
     {
         return $this->hasMany(Backup::class);
@@ -358,11 +369,6 @@ class Server extends Model
     public function activity(): MorphToMany
     {
         return $this->morphToMany(ActivityLog::class, 'subject', 'activity_log_subjects');
-    }
-
-    public function getRouteKeyName(): string
-    {
-        return 'id';
     }
 
     public function resolveRouteBinding($value, $field = null): ?self
@@ -420,6 +426,8 @@ class Server extends Model
     /**
      * Sends a command or multiple commands to a running server instance.
      *
+     * @param  string[]|string  $command
+     *
      * @throws ConnectionException
      */
     public function send(array|string $command): ResponseInterface
@@ -429,23 +437,26 @@ class Server extends Model
         ])->toPsrResponse();
     }
 
-    public function retrieveStatus(): string
+    public function retrieveStatus(): ContainerStatus
     {
         $status = cache()->get("servers.$this->uuid.container.status");
 
-        if ($status) {
-            return $status;
+        if ($status === null) {
+            $this->node->serverStatuses();
+
+            $status = cache()->get("servers.$this->uuid.container.status");
         }
 
-        $this->node->serverStatuses();
-
-        return cache()->get("servers.$this->uuid.container.status") ?? 'missing';
+        return ContainerStatus::tryFrom($status) ?? ContainerStatus::Missing;
     }
 
+    /**
+     * @return array<mixed>
+     */
     public function resources(): array
     {
         return cache()->remember("resources:$this->uuid", now()->addSeconds(15), function () {
-            // @phpstan-ignore-next-line
+            // @phpstan-ignore myCustomRules.forbiddenGlobalFunctions
             return Arr::get(app(DaemonServerRepository::class)->setServer($this)->getDetails(), 'utilization', []);
         });
     }
@@ -458,8 +469,11 @@ class Server extends Model
         }
 
         if ($type === ServerResourceType::Time) {
+            if ($this->isSuspended()) {
+                return 'Suspended';
+            }
             if ($resourceAmount === 0) {
-                return 'Offline';
+                return ContainerStatus::Offline->getLabel();
             }
 
             return now()->subMillis($resourceAmount)->diffForHumans(syntax: CarbonInterface::DIFF_ABSOLUTE, short: true, parts: 4);
@@ -484,34 +498,7 @@ class Server extends Model
     public function condition(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->status?->value ?? $this->retrieveStatus(),
+            get: fn () => $this->isSuspended() ? ServerState::Suspended : $this->status ?? $this->retrieveStatus(),
         );
-    }
-
-    public function conditionIcon(): string
-    {
-        if ($this->status === null) {
-            $containerStatus = ContainerStatus::from($this->retrieveStatus());
-
-            return $containerStatus->icon();
-        }
-
-        return $this->status->icon();
-    }
-
-    public function conditionColor(): string
-    {
-        if ($this->status === null) {
-            $containerStatus = ContainerStatus::from($this->retrieveStatus());
-
-            return $containerStatus->color();
-        }
-
-        return $this->status->color();
-    }
-
-    public function conditionColorHex(): string
-    {
-        return ContainerStatus::from($this->retrieveStatus())->colorHex();
     }
 }

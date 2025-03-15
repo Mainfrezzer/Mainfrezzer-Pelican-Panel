@@ -22,7 +22,10 @@ use App\Http\Requests\Api\Client\Servers\Files\CompressFilesRequest;
 use App\Http\Requests\Api\Client\Servers\Files\DecompressFilesRequest;
 use App\Http\Requests\Api\Client\Servers\Files\GetFileContentsRequest;
 use App\Http\Requests\Api\Client\Servers\Files\WriteFileContentRequest;
+use Dedoc\Scramble\Attributes\Group;
+use Illuminate\Http\Client\ConnectionException;
 
+#[Group('Server - File', weight: 0)]
 class FileController extends ClientApiController
 {
     /**
@@ -36,9 +39,13 @@ class FileController extends ClientApiController
     }
 
     /**
+     * List files
+     *
      * Returns a listing of files in a given directory.
      *
-     * @throws \App\Exceptions\Http\Connection\DaemonConnectionException
+     * @return array<array-key, mixed>
+     *
+     * @throws ConnectionException
      */
     public function directory(ListFilesRequest $request, Server $server): array
     {
@@ -52,6 +59,8 @@ class FileController extends ClientApiController
     }
 
     /**
+     * View file
+     *
      * Return the contents of a specified file for the user.
      *
      * @throws \Throwable
@@ -63,14 +72,19 @@ class FileController extends ClientApiController
             config('panel.files.max_edit_size')
         );
 
-        Activity::event('server:file.read')->property('file', $request->get('file'))->log();
+        Activity::event('server:file.read')
+            ->property('file', $request->get('file'))
+            ->log();
 
         return new Response($response, Response::HTTP_OK, ['Content-Type' => 'text/plain']);
     }
 
     /**
-     * Generates a one-time token with a link that the user can use to
-     * download a given file.
+     * Download file
+     *
+     * Generates a one-time token with a link that the user can use to download a given file.
+     *
+     * @return array<array-key, mixed>
      *
      * @throws \Throwable
      */
@@ -100,20 +114,28 @@ class FileController extends ClientApiController
     }
 
     /**
+     * Write file
+     *
      * Writes the contents of the specified file to the server.
      *
-     * @throws \App\Exceptions\Http\Connection\DaemonConnectionException
+     * @throws ConnectionException
      */
     public function write(WriteFileContentRequest $request, Server $server): JsonResponse
     {
-        $this->fileRepository->setServer($server)->putContent($request->get('file'), $request->getContent());
+        $this->fileRepository
+            ->setServer($server)
+            ->putContent($request->get('file'), $request->getContent());
 
-        Activity::event('server:file.write')->property('file', $request->get('file'))->log();
+        Activity::event('server:file.write')
+            ->property('file', $request->get('file'))
+            ->log();
 
         return new JsonResponse([], Response::HTTP_NO_CONTENT);
     }
 
     /**
+     * Create directory
+     *
      * Creates a new folder on the server.
      *
      * @throws \Throwable
@@ -133,28 +155,36 @@ class FileController extends ClientApiController
     }
 
     /**
+     * Rename file
+     *
      * Renames a file on the remote machine.
      *
      * @throws \Throwable
      */
     public function rename(RenameFileRequest $request, Server $server): JsonResponse
     {
+        $files = $request->input('files');
+
         $this->fileRepository
             ->setServer($server)
-            ->renameFiles($request->input('root'), $request->input('files'));
+            ->renameFiles($request->input('root'), $files);
 
         Activity::event('server:file.rename')
             ->property('directory', $request->input('root'))
-            ->property('files', $request->input('files'))
+            ->property('files', $files)
+            ->property('to', $files['to'])
+            ->property('from', $files['from'])
             ->log();
 
         return new JsonResponse([], Response::HTTP_NO_CONTENT);
     }
 
     /**
+     * Copy file
+     *
      * Copies a file on the server.
      *
-     * @throws \App\Exceptions\Http\Connection\DaemonConnectionException
+     * @throws ConnectionException
      */
     public function copy(CopyFileRequest $request, Server $server): JsonResponse
     {
@@ -162,13 +192,19 @@ class FileController extends ClientApiController
             ->setServer($server)
             ->copyFile($request->input('location'));
 
-        Activity::event('server:file.copy')->property('file', $request->input('location'))->log();
+        Activity::event('server:file.copy')
+            ->property('file', $request->input('location'))
+            ->log();
 
         return new JsonResponse([], Response::HTTP_NO_CONTENT);
     }
 
     /**
-     * @throws \App\Exceptions\Http\Connection\DaemonConnectionException
+     * Compress files
+     *
+     * @return array<array-key, mixed>
+     *
+     * @throws ConnectionException
      */
     public function compress(CompressFilesRequest $request, Server $server): array
     {
@@ -188,7 +224,9 @@ class FileController extends ClientApiController
     }
 
     /**
-     * @throws \App\Exceptions\Http\Connection\DaemonConnectionException
+     * Decompress files
+     *
+     * @throws ConnectionException
      */
     public function decompress(DecompressFilesRequest $request, Server $server): JsonResponse
     {
@@ -201,16 +239,18 @@ class FileController extends ClientApiController
 
         Activity::event('server:file.decompress')
             ->property('directory', $request->input('root'))
-            ->property('files', $request->input('file'))
+            ->property('file', $request->input('file'))
             ->log();
 
         return new JsonResponse([], JsonResponse::HTTP_NO_CONTENT);
     }
 
     /**
+     * Delete files/ folders
+     *
      * Deletes files or folders for the server in the given root directory.
      *
-     * @throws \App\Exceptions\Http\Connection\DaemonConnectionException
+     * @throws ConnectionException
      */
     public function delete(DeleteFileRequest $request, Server $server): JsonResponse
     {
@@ -228,9 +268,11 @@ class FileController extends ClientApiController
     }
 
     /**
+     * Update file permissions
+     *
      * Updates file permissions for file(s) in the given root directory.
      *
-     * @throws \App\Exceptions\Http\Connection\DaemonConnectionException
+     * @throws ConnectionException
      */
     public function chmod(ChmodFilesRequest $request, Server $server): JsonResponse
     {
@@ -243,6 +285,8 @@ class FileController extends ClientApiController
     }
 
     /**
+     * Pull remote file
+     *
      * Requests that a file be downloaded from a remote location by daemon.
      *
      * @throws \Throwable

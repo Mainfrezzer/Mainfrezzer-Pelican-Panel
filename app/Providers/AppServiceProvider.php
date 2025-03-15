@@ -5,7 +5,11 @@ namespace App\Providers;
 use App\Checks\NodeVersionsCheck;
 use App\Checks\PanelVersionCheck;
 use App\Checks\UsedDiskSpaceCheck;
-use App\Filament\Server\Pages\Console;
+use App\Extensions\OAuth\Providers\AuthentikProvider;
+use App\Extensions\OAuth\Providers\CommonProvider;
+use App\Extensions\OAuth\Providers\DiscordProvider;
+use App\Extensions\OAuth\Providers\GithubProvider;
+use App\Extensions\OAuth\Providers\SteamProvider;
 use App\Models;
 use App\Models\ApiKey;
 use App\Models\Node;
@@ -18,22 +22,23 @@ use Filament\Support\Colors\Color;
 use Filament\Support\Facades\FilamentColor;
 use Filament\Support\Facades\FilamentView;
 use Filament\View\PanelsRenderHook;
+use Illuminate\Config\Repository;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Console\AboutCommand;
-use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
-use SocialiteProviders\Manager\SocialiteWasCalled;
-use Spatie\Health\Checks\Checks\CacheCheck;
-use Spatie\Health\Checks\Checks\DatabaseCheck;
-use Spatie\Health\Checks\Checks\DebugModeCheck;
-use Spatie\Health\Checks\Checks\EnvironmentCheck;
-use Spatie\Health\Checks\Checks\ScheduleCheck;
+use App\Checks\CacheCheck;
+use App\Checks\DatabaseCheck;
+use App\Checks\DebugModeCheck;
+use App\Checks\EnvironmentCheck;
+use App\Checks\ScheduleCheck;
+use App\Extensions\Captcha\Providers\TurnstileProvider;
 use Spatie\Health\Facades\Health;
 
 class AppServiceProvider extends ServiceProvider
@@ -41,12 +46,19 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Bootstrap any application services.
      */
-    public function boot(Application $app, SoftwareVersionService $versionService): void
-    {
+    public function boot(
+        Application $app,
+        SoftwareVersionService $versionService,
+        Repository $config,
+    ): void {
         // If the APP_URL value is set with https:// make sure we force it here. Theoretically
         // this should just work with the proxy logic, but there are a lot of cases where it
         // doesn't, and it triggers a lot of support requests, so lets just head it off here.
         URL::forceHttps(Str::startsWith(config('app.url') ?? '', 'https://'));
+
+        if ($app->runningInConsole() && empty(config('app.key'))) {
+            $config->set('app.key', '');
+        }
 
         Relation::enforceMorphMap([
             'allocation' => Models\Allocation::class,
@@ -76,26 +88,29 @@ class AppServiceProvider extends ServiceProvider
 
         Sanctum::usePersonalAccessTokenModel(ApiKey::class);
 
-        $bearerTokens = fn (OpenApi $openApi) => $openApi->secure(SecurityScheme::http('bearer'));
         Gate::define('viewApiDocs', fn () => true);
-        Scramble::registerApi('application', ['api_path' => 'api/application', 'info' => ['version' => '1.0']]);
+
+        $bearerTokens = fn (OpenApi $openApi) => $openApi->secure(SecurityScheme::http('bearer'));
+        Scramble::registerApi('application', ['api_path' => 'api/application', 'info' => ['version' => '1.0']])->afterOpenApiGenerated($bearerTokens);
         Scramble::registerApi('client', ['api_path' => 'api/client', 'info' => ['version' => '1.0']])->afterOpenApiGenerated($bearerTokens);
-        Scramble::registerApi('remote', ['api_path' => 'api/remote', 'info' => ['version' => '1.0']])->afterOpenApiGenerated($bearerTokens);
 
-        $oauthProviders = [];
-        foreach (config('auth.oauth') as $name => $data) {
-            config()->set("services.$name", array_merge($data['service'], ['redirect' => "/auth/oauth/callback/$name"]));
+        // Default OAuth providers included with Socialite
+        CommonProvider::register($app, 'facebook', null, 'tabler-brand-facebook-f', '#1877f2');
+        CommonProvider::register($app, 'x', null, 'tabler-brand-x-f', '#1da1f2');
+        CommonProvider::register($app, 'linkedin', null, 'tabler-brand-linkedin-f', '#0a66c2');
+        CommonProvider::register($app, 'google', null, 'tabler-brand-google-f', '#4285f4');
+        GithubProvider::register($app);
+        CommonProvider::register($app, 'gitlab', null, 'tabler-brand-gitlab', '#fca326');
+        CommonProvider::register($app, 'bitbucket', null, 'tabler-brand-bitbucket-f', '#205081');
+        CommonProvider::register($app, 'slack', null, 'tabler-brand-slack', '#6ecadc');
 
-            if (isset($data['provider'])) {
-                $oauthProviders[$name] = $data['provider'];
-            }
-        }
+        // Additional OAuth providers from socialiteproviders.com
+        AuthentikProvider::register($app);
+        DiscordProvider::register($app);
+        SteamProvider::register($app);
 
-        Event::listen(function (SocialiteWasCalled $event) use ($oauthProviders) {
-            foreach ($oauthProviders as $name => $provider) {
-                $event->extendSocialite($name, $provider);
-            }
-        });
+        // Default Captcha provider
+        TurnstileProvider::register($app);
 
         FilamentColor::register([
             'danger' => Color::Red,
@@ -107,9 +122,24 @@ class AppServiceProvider extends ServiceProvider
         ]);
 
         FilamentView::registerRenderHook(
-            PanelsRenderHook::CONTENT_START,
-            fn () => view('filament.server-conflict-banner'),
-            scopes: Console::class,
+            PanelsRenderHook::HEAD_START,
+            fn (): string => Blade::render(<<<'HTML'
+                @vite(['resources/css/app.css', 'resources/js/app.js'])
+                @livewireStyles
+            HTML),
+        );
+
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::PAGE_START,
+            fn () => Blade::render('@livewire(\App\Livewire\AlertBannerContainer::class)'),
+        );
+
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::BODY_END,
+            fn (): string => Blade::render(<<<'HTML'
+                @livewireScripts
+                @vite(['resources/js/app.js'])
+            HTML),
         );
 
         // Don't run any health checks during tests
@@ -146,7 +176,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        Scramble::extendOpenApi(fn (OpenApi $openApi) => $openApi->secure(SecurityScheme::http('bearer')));
         Scramble::ignoreDefaultRoutes();
     }
 }

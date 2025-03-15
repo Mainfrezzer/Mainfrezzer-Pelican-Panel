@@ -2,16 +2,13 @@
 
 namespace App\Services\Files;
 
-use App\Exceptions\Http\Connection\DaemonConnectionException;
 use App\Models\Server;
 use App\Repositories\Daemon\DaemonFileRepository;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Str;
 
-class DeleteFilesService
+readonly class DeleteFilesService
 {
-    /**
-     * DeleteFilesService constructor.
-     */
     public function __construct(
         private DaemonFileRepository $daemonFileRepository
     ) {}
@@ -19,7 +16,9 @@ class DeleteFilesService
     /**
      * Deletes the given files.
      *
-     * @throws DaemonConnectionException
+     * @param  string[]  $files
+     *
+     * @throws ConnectionException
      */
     public function handle(Server $server, array $files): void
     {

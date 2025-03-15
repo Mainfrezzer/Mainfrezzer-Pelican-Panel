@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Application\Servers;
 
+use App\Enums\SuspendAction;
 use App\Http\Controllers\Api\Application\ApplicationApiController;
 use App\Http\Requests\Api\Application\Servers\ServerWriteRequest;
 use App\Models\Server;
@@ -9,8 +10,11 @@ use App\Repositories\Daemon\DaemonServerRepository;
 use App\Services\Servers\ReinstallServerService;
 use App\Services\Servers\SuspensionService;
 use App\Services\Servers\TransferServerService;
+use Dedoc\Scramble\Attributes\Group;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Response;
 
+#[Group('Server', weight: 4)]
 class ServerManagementController extends ApplicationApiController
 {
     /**
@@ -26,30 +30,36 @@ class ServerManagementController extends ApplicationApiController
     }
 
     /**
+     * Suspsend
+     *
      * Suspend a server on the Panel.
      *
      * @throws \Throwable
      */
     public function suspend(ServerWriteRequest $request, Server $server): Response
     {
-        $this->suspensionService->toggle($server);
+        $this->suspensionService->handle($server, SuspendAction::Suspend);
 
         return $this->returnNoContent();
     }
 
     /**
+     * Unsuspsend
+     *
      * Unsuspend a server on the Panel.
      *
      * @throws \Throwable
      */
     public function unsuspend(ServerWriteRequest $request, Server $server): Response
     {
-        $this->suspensionService->toggle($server, SuspensionService::ACTION_UNSUSPEND);
+        $this->suspensionService->handle($server, SuspendAction::Unsuspend);
 
         return $this->returnNoContent();
     }
 
     /**
+     * Reinstall
+     *
      * Mark a server as needing to be reinstalled.
      *
      * @throws \App\Exceptions\DisplayException
@@ -63,6 +73,8 @@ class ServerManagementController extends ApplicationApiController
     }
 
     /**
+     * Start transfer
+     *
      * Starts a transfer of a server to a new node.
      */
     public function startTransfer(ServerWriteRequest $request, Server $server): Response
@@ -79,19 +91,21 @@ class ServerManagementController extends ApplicationApiController
         }
 
         // Node was not viable
-        return new Response('', Response::HTTP_NOT_ACCEPTABLE);
+        return $this->returnNotAcceptable();
     }
 
     /**
+     * Cancel transfer
+     *
      * Cancels a transfer of a server to a new node.
      *
-     * @throws \App\Exceptions\Http\Connection\DaemonConnectionException
+     * @throws ConnectionException
      */
     public function cancelTransfer(ServerWriteRequest $request, Server $server): Response
     {
         if (!$transfer = $server->transfer) {
             // Server is not transferring
-            return new Response('', Response::HTTP_NOT_ACCEPTABLE);
+            return $this->returnNotAcceptable();
         }
 
         $transfer->successful = true;

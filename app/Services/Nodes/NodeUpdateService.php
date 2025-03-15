@@ -6,8 +6,8 @@ use Illuminate\Support\Str;
 use App\Models\Node;
 use Illuminate\Database\ConnectionInterface;
 use App\Repositories\Daemon\DaemonConfigurationRepository;
-use App\Exceptions\Http\Connection\DaemonConnectionException;
 use App\Exceptions\Service\Node\ConfigurationNotPersistedException;
+use Illuminate\Http\Client\ConnectionException;
 
 class NodeUpdateService
 {
@@ -21,6 +21,8 @@ class NodeUpdateService
 
     /**
      * Update the configuration values for a given node on the machine.
+     *
+     * @param  array<string, mixed>  $data
      *
      * @throws \Throwable
      */
@@ -42,7 +44,7 @@ class NodeUpdateService
                 $node->fqdn = $updated->fqdn;
 
                 $this->configurationRepository->setNode($node)->update($updated);
-            } catch (DaemonConnectionException $exception) {
+            } catch (ConnectionException $exception) {
                 logger()->warning($exception, ['node_id' => $node->id]);
 
                 // Never actually throw these exceptions up the stack. If we were able to change the settings

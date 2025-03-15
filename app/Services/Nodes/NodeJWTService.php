@@ -3,6 +3,7 @@
 namespace App\Services\Nodes;
 
 use Carbon\CarbonImmutable;
+use DateTimeImmutable;
 use Illuminate\Support\Str;
 use App\Models\Node;
 use App\Models\User;
@@ -14,16 +15,19 @@ use App\Extensions\Lcobucci\JWT\Encoding\TimestampDates;
 
 class NodeJWTService
 {
+    /** @var array<array-key, mixed> */
     private array $claims = [];
 
     private ?User $user = null;
 
-    private ?\DateTimeImmutable $expiresAt;
+    private DateTimeImmutable $expiresAt;
 
     private ?string $subject = null;
 
     /**
      * Set the claims to include in this JWT.
+     *
+     * @param  array<array-key, mixed>  $claims
      */
     public function setClaims(array $claims): self
     {
@@ -43,7 +47,7 @@ class NodeJWTService
         return $this;
     }
 
-    public function setExpiresAt(\DateTimeImmutable $date): self
+    public function setExpiresAt(DateTimeImmutable $date): self
     {
         $this->expiresAt = $date;
 
@@ -73,9 +77,7 @@ class NodeJWTService
             ->issuedAt(CarbonImmutable::now())
             ->canOnlyBeUsedAfter(CarbonImmutable::now()->subMinutes(5));
 
-        if ($this->expiresAt) {
-            $builder = $builder->expiresAt($this->expiresAt);
-        }
+        $builder = $builder->expiresAt($this->expiresAt);
 
         if (!empty($this->subject)) {
             $builder = $builder->relatedTo($this->subject)->withHeader('sub', $this->subject);

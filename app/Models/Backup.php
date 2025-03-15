@@ -2,7 +2,11 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Builder;
+use App\Contracts\Validatable;
+use App\Traits\HasValidation;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use App\Eloquent\BackupQueryBuilder;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -23,10 +27,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property \Carbon\CarbonImmutable $updated_at
  * @property \Carbon\CarbonImmutable|null $deleted_at
  * @property \App\Models\Server $server
- * @property \App\Models\AuditLog[] $audits
  */
-class Backup extends Model
+class Backup extends Model implements Validatable
 {
+    use HasFactory;
+    use HasValidation;
     use SoftDeletes;
 
     public const RESOURCE_NAME = 'backup';
@@ -34,8 +39,6 @@ class Backup extends Model
     public const ADAPTER_DAEMON = 'wings';
 
     public const ADAPTER_AWS_S3 = 's3';
-
-    protected $table = 'backups';
 
     protected $attributes = [
         'is_successful' => false,
@@ -47,17 +50,18 @@ class Backup extends Model
 
     protected $guarded = ['id', 'created_at', 'updated_at', 'deleted_at'];
 
+    /** @var array<array-key, string[]> */
     public static array $validationRules = [
-        'server_id' => 'bail|required|numeric|exists:servers,id',
-        'uuid' => 'required|uuid',
-        'is_successful' => 'boolean',
-        'is_locked' => 'boolean',
-        'name' => 'required|string',
-        'ignored_files' => 'array',
-        'disk' => 'required|string',
-        'checksum' => 'nullable|string',
-        'bytes' => 'numeric',
-        'upload_id' => 'nullable|string',
+        'server_id' => ['bail', 'required', 'numeric', 'exists:servers,id'],
+        'uuid' => ['required', 'uuid'],
+        'is_successful' => ['boolean'],
+        'is_locked' => ['boolean'],
+        'name' => ['required', 'string'],
+        'ignored_files' => ['array'],
+        'disk' => ['required', 'string'],
+        'checksum' => ['nullable', 'string'],
+        'bytes' => ['numeric'],
+        'upload_id' => ['nullable', 'string'],
     ];
 
     protected function casts(): array
@@ -81,10 +85,11 @@ class Backup extends Model
     }
 
     /**
-     * Returns a query filtering only non-failed backups for a specific server.
+     * @param  \Illuminate\Database\Query\Builder  $query
+     * @return BackupQueryBuilder<\Illuminate\Database\Eloquent\Model>
      */
-    public function scopeNonFailed(Builder $query): void
+    public function newEloquentBuilder($query): BackupQueryBuilder
     {
-        $query->whereNull('completed_at')->orWhere('is_successful', true);
+        return new BackupQueryBuilder($query);
     }
 }

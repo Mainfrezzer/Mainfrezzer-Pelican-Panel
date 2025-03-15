@@ -2,8 +2,12 @@
 
 namespace App\Models;
 
+use App\Contracts\Validatable;
 use App\Exceptions\Service\Egg\HasChildrenException;
 use App\Exceptions\Service\HasActiveServersException;
+use App\Traits\HasValidation;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
@@ -14,12 +18,12 @@ use Illuminate\Support\Str;
  * @property string $author
  * @property string $name
  * @property string|null $description
- * @property array|null $features
+ * @property string[]|null $features
  * @property string $docker_image -- deprecated, use $docker_images
- * @property array<string, string> $docker_images
+ * @property array<array-key, string> $docker_images
  * @property string|null $update_url
  * @property bool $force_outgoing_ip
- * @property array|null $file_denylist
+ * @property string[]|null $file_denylist
  * @property string|null $config_files
  * @property string|null $config_startup
  * @property string|null $config_logs
@@ -41,7 +45,7 @@ use Illuminate\Support\Str;
  * @property string|null $inherit_config_logs
  * @property string|null $inherit_config_stop
  * @property string $inherit_file_denylist
- * @property array|null $inherit_features
+ * @property string[]|null $inherit_features
  * @property \Illuminate\Database\Eloquent\Collection|\App\Models\Server[] $servers
  * @property int|null $servers_count
  * @property \Illuminate\Database\Eloquent\Collection|\App\Models\EggVariable[] $variables
@@ -49,8 +53,11 @@ use Illuminate\Support\Str;
  * @property \App\Models\Egg|null $scriptFrom
  * @property \App\Models\Egg|null $configFrom
  */
-class Egg extends Model
+class Egg extends Model implements Validatable
 {
+    use HasFactory;
+    use HasValidation;
+
     /**
      * The resource name for this model when it is transformed into an
      * API representation using fractal. Also used as name for api key permissions.
@@ -74,11 +81,6 @@ class Egg extends Model
     public const FEATURE_EULA_POPUP = 'eula';
 
     public const FEATURE_FASTDL = 'fastdl';
-
-    /**
-     * The table associated with the model.
-     */
-    protected $table = 'eggs';
 
     /**
      * Fields that are not mass assignable.
@@ -107,24 +109,25 @@ class Egg extends Model
         'tags',
     ];
 
+    /** @var array<array-key, string[]> */
     public static array $validationRules = [
-        'uuid' => 'required|string|size:36',
-        'name' => 'required|string|max:255',
-        'description' => 'string|nullable',
-        'features' => 'array|nullable',
-        'author' => 'required|string|email',
-        'file_denylist' => 'array|nullable',
-        'file_denylist.*' => 'string',
-        'docker_images' => 'required|array|min:1',
-        'docker_images.*' => 'required|string',
-        'startup' => 'required|nullable|string',
-        'config_from' => 'sometimes|bail|nullable|numeric|exists:eggs,id',
-        'config_stop' => 'required_without:config_from|nullable|string|max:255',
-        'config_startup' => 'required_without:config_from|nullable|json',
-        'config_logs' => 'required_without:config_from|nullable|json',
-        'config_files' => 'required_without:config_from|nullable|json',
-        'update_url' => 'sometimes|nullable|string',
-        'force_outgoing_ip' => 'sometimes|boolean',
+        'uuid' => ['required', 'string', 'size:36'],
+        'name' => ['required', 'string', 'max:255'],
+        'description' => ['string', 'nullable'],
+        'features' => ['array', 'nullable'],
+        'author' => ['required', 'string', 'email'],
+        'file_denylist' => ['array', 'nullable'],
+        'file_denylist.*' => ['string'],
+        'docker_images' => ['required', 'array', 'min:1'],
+        'docker_images.*' => ['required', 'string'],
+        'startup' => ['required', 'nullable', 'string'],
+        'config_from' => ['sometimes', 'bail', 'nullable', 'numeric', 'exists:eggs,id'],
+        'config_stop' => ['required_without:config_from', 'nullable', 'string', 'max:255'],
+        'config_startup' => ['required_without:config_from', 'nullable', 'json'],
+        'config_logs' => ['required_without:config_from', 'nullable', 'json'],
+        'config_files' => ['required_without:config_from', 'nullable', 'json'],
+        'update_url' => ['sometimes', 'nullable', 'string'],
+        'force_outgoing_ip' => ['sometimes', 'boolean'],
     ];
 
     protected $attributes = [
@@ -165,11 +168,6 @@ class Egg extends Model
 
             throw_if($egg->children()->count(), new HasChildrenException(trans('exceptions.egg.has_children')));
         });
-    }
-
-    public function getRouteKeyName(): string
-    {
-        return 'id';
     }
 
     /**
@@ -262,6 +260,8 @@ class Egg extends Model
     /**
      * Returns the features available to this egg from the parent configuration if there are
      * no features defined for this egg specifically and there is a parent egg configured.
+     *
+     * @return ?string[]
      */
     public function getInheritFeaturesAttribute(): ?array
     {
@@ -275,6 +275,8 @@ class Egg extends Model
     /**
      * Returns the features available to this egg from the parent configuration if there are
      * no features defined for this egg specifically and there is a parent egg configured.
+     *
+     * @return ?string[]
      */
     public function getInheritFileDenylistAttribute(): ?array
     {

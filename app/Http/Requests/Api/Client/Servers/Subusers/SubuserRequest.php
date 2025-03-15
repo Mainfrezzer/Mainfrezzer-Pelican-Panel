@@ -47,6 +47,8 @@ abstract class SubuserRequest extends ClientApiRequest
      * Validates that the permissions we are trying to assign can actually be assigned
      * by the user making the request.
      *
+     * @param  string[]  $permissions
+     *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
     protected function validatePermissionsCanBeAssigned(array $permissions): void
@@ -55,8 +57,8 @@ abstract class SubuserRequest extends ClientApiRequest
         /** @var \App\Models\Server $server */
         $server = $this->route()->parameter('server');
 
-        // If we are a root admin or the server owner, no need to perform these checks.
-        if ($user->isRootAdmin() || $user->id === $server->owner_id) {
+        // If we are an admin or the server owner, no need to perform these checks.
+        if ($user->can('update server', $server) || $user->id === $server->owner_id) {
             return;
         }
 

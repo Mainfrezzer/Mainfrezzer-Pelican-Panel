@@ -20,6 +20,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\Mailer\Exception\TransportException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Throwable;
 
 class Handler extends ExceptionHandler
 {
@@ -45,6 +46,8 @@ class Handler extends ExceptionHandler
     /**
      * Maps exceptions to a specific response code. This handles special exception
      * types that don't have a defined response code.
+     *
+     * @var array<class-string, int>
      */
     protected static array $exceptionResponseCodes = [
         AuthenticationException::class => 401,
@@ -180,9 +183,16 @@ class Handler extends ExceptionHandler
     }
 
     /**
-     * Return the exception as a JSONAPI representation for use on API requests.
+     * @param  array<string, mixed>  $override
+     * @return array{errors: array{
+     *     code: string,
+     *     status: string,
+     *     detail: string,
+     *     source?: array{line: int, file: string},
+     *     meta?: array{trace: string[], previous: string[]}
+     * }}|array{errors: array{non-empty-array<string, mixed>}}
      */
-    protected function convertExceptionToArray(\Throwable $e, array $override = []): array
+    public static function exceptionToArray(Throwable $e, array $override = []): array
     {
         $match = self::$exceptionResponseCodes[get_class($e)] ?? null;
 
@@ -214,7 +224,7 @@ class Handler extends ExceptionHandler
                     'trace' => Collection::make($e->getTrace())
                         ->map(fn ($trace) => Arr::except($trace, ['args']))
                         ->all(),
-                    'previous' => Collection::make($this->extractPrevious($e))
+                    'previous' => Collection::make(self::extractPrevious($e))
                         ->map(fn ($exception) => $exception->getTrace())
                         ->map(fn ($trace) => Arr::except($trace, ['args']))
                         ->all(),
@@ -223,6 +233,17 @@ class Handler extends ExceptionHandler
         }
 
         return ['errors' => [array_merge($error, $override)]];
+    }
+
+    /**
+     * Return the exception as a JSONAPI representation for use on API requests.
+     *
+     * @param  array{detail?: mixed, source?: mixed, meta?: mixed}  $override
+     * @return array{errors?: array<mixed>}
+     */
+    protected function convertExceptionToArray(Throwable $e, array $override = []): array
+    {
+        return self::exceptionToArray($e, $override);
     }
 
     /**
@@ -244,22 +265,19 @@ class Handler extends ExceptionHandler
             return new JsonResponse($this->convertExceptionToArray($exception), JsonResponse::HTTP_UNAUTHORIZED);
         }
 
-        return redirect()->guest('/auth/login');
+        return redirect()->guest(route('filament.app.auth.login'));
     }
 
     /**
      * Extracts all the previous exceptions that lead to the one passed into this
      * function being thrown.
      *
-     * @return \Throwable[]
+     * @return Throwable[]
      */
-    protected function extractPrevious(\Throwable $e): array
+    public static function extractPrevious(Throwable $e): array
     {
         $previous = [];
         while ($value = $e->getPrevious()) {
-            if (!$value instanceof \Throwable) {
-                break;
-            }
             $previous[] = $value;
             $e = $value;
         }
@@ -270,10 +288,11 @@ class Handler extends ExceptionHandler
     /**
      * Helper method to allow reaching into the handler to convert an exception
      * into the expected array response type.
+     *
+     * @return array<mixed>
      */
     public static function toArray(\Throwable $e): array
     {
-        // @phpstan-ignore-next-line
-        return (new self(app()))->convertExceptionToArray($e);
+        return self::exceptionToArray($e);
     }
 }

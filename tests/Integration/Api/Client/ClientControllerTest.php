@@ -8,6 +8,7 @@ use App\Models\Subuser;
 use App\Models\Allocation;
 use App\Models\Permission;
 use App\Models\Role;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class ClientControllerTest extends ClientApiIntegrationTestCase
 {
@@ -17,7 +18,7 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
      * a subuser, but for this test we just want to test a basic scenario and pretend
      * subusers do not exist at all.
      */
-    public function testOnlyLoggedInUsersServersAreReturned(): void
+    public function test_only_logged_in_users_servers_are_returned(): void
     {
         /** @var \App\Models\User[] $users */
         $users = User::factory()->times(3)->create();
@@ -44,7 +45,7 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
      * Test that using ?filter[*]=name|uuid returns any server matching that name or UUID
      * with the search filters.
      */
-    public function testServersAreFilteredUsingNameAndUuidInformation(): void
+    public function test_servers_are_filtered_using_name_and_uuid_information(): void
     {
         /** @var \App\Models\User[] $users */
         $users = User::factory()->times(2)->create();
@@ -100,7 +101,7 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
      * Test that using ?filter[*]=:25565 or ?filter[*]=192.168.1.1:25565 returns only those servers
      * with the same allocation for the given user.
      */
-    public function testServersAreFilteredUsingAllocationInformation(): void
+    public function test_servers_are_filtered_using_allocation_information(): void
     {
         /** @var \App\Models\User $user */
         /** @var \App\Models\Server $server */
@@ -142,7 +143,7 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
     /**
      * Test that servers where the user is a subuser are returned by default in the API call.
      */
-    public function testServersUserIsASubuserOfAreReturned(): void
+    public function test_servers_user_is_a_subuser_of_are_returned(): void
     {
         /** @var \App\Models\User[] $users */
         $users = User::factory()->times(3)->create();
@@ -173,7 +174,7 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
     /**
      * Returns only servers that the user owns, not servers they are a subuser of.
      */
-    public function testFilterOnlyOwnerServers(): void
+    public function test_filter_only_owner_servers(): void
     {
         /** @var \App\Models\User[] $users */
         $users = User::factory()->times(3)->create();
@@ -202,7 +203,7 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
     /**
      * Tests that the permissions from the Panel are returned correctly.
      */
-    public function testPermissionsAreReturned(): void
+    public function test_permissions_are_returned(): void
     {
         /** @var \App\Models\User $user */
         $user = User::factory()->create();
@@ -222,7 +223,7 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
      * Test that only servers a user can access because they are an administrator are returned. This
      * will always exclude any servers they can see because they're the owner or a subuser of the server.
      */
-    public function testOnlyAdminLevelServersAreReturned(): void
+    public function test_only_admin_level_servers_are_returned(): void
     {
         /** @var \App\Models\User[] $users */
         $users = User::factory()->times(4)->create();
@@ -257,7 +258,7 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
     /**
      * Test that all servers a user can access as an admin are returned if using ?filter=admin-all.
      */
-    public function testAllServersAreReturnedToAdmin(): void
+    public function test_all_servers_are_returned_to_admin(): void
     {
         /** @var \App\Models\User[] $users */
         $users = User::factory()->times(4)->create();
@@ -286,10 +287,9 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
     /**
      * Test that no servers get returned if the user requests all admin level servers by using
      * ?type=admin or ?type=admin-all in the request.
-     *
-     * @dataProvider filterTypeDataProvider
      */
-    public function testNoServersAreReturnedIfAdminFilterIsPassedByRegularUser(string $type): void
+    #[DataProvider('filterTypeDataProvider')]
+    public function test_no_servers_are_returned_if_admin_filter_is_passed_by_regular_user(string $type): void
     {
         /** @var \App\Models\User[] $users */
         $users = User::factory()->times(3)->create();
@@ -308,7 +308,7 @@ class ClientControllerTest extends ClientApiIntegrationTestCase
      * Test that a subuser without the allocation.read permission is only able to see the primary
      * allocation for the server.
      */
-    public function testOnlyPrimaryAllocationIsReturnedToSubuser(): void
+    public function test_only_primary_allocation_is_returned_to_subuser(): void
     {
         /** @var \App\Models\Server $server */
         [$user, $server] = $this->generateTestAccount([Permission::ACTION_WEBSOCKET_CONNECT]);

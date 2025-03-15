@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Client;
 
+use Illuminate\Auth\SessionGuard;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Auth\AuthManager;
@@ -22,6 +23,11 @@ class AccountController extends ClientApiController
         parent::__construct();
     }
 
+    /**
+     * View account
+     *
+     * @return array<array-key, mixed>
+     */
     public function index(Request $request): array
     {
         return $this->fractal->item($request->user())
@@ -30,6 +36,8 @@ class AccountController extends ClientApiController
     }
 
     /**
+     * Update email
+     *
      * Update the authenticated user's email address.
      */
     public function updateEmail(UpdateEmailRequest $request): JsonResponse
@@ -47,6 +55,8 @@ class AccountController extends ClientApiController
     }
 
     /**
+     * Update password
+     *
      * Update the authenticated user's password. All existing sessions will be logged
      * out immediately.
      *
@@ -63,8 +73,7 @@ class AccountController extends ClientApiController
         // other devices functionality to work.
         $guard->setUser($user);
 
-        // This method doesn't exist in the stateless Sanctum world.
-        if (method_exists($guard, 'logoutOtherDevices')) {
+        if ($guard instanceof SessionGuard) {
             $guard->logoutOtherDevices($request->input('password'));
         }
 

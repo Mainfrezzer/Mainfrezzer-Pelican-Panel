@@ -8,15 +8,15 @@ use App\Models\Server;
 use App\Models\Permission;
 use App\Repositories\Daemon\DaemonServerRepository;
 use App\Tests\Integration\Api\Client\ClientApiIntegrationTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class SettingsControllerTest extends ClientApiIntegrationTestCase
 {
     /**
      * Test that the server's name can be changed.
-     *
-     * @dataProvider renamePermissionsDataProvider
      */
-    public function testServerNameCanBeChanged(array $permissions): void
+    #[DataProvider('renamePermissionsDataProvider')]
+    public function test_server_name_can_be_changed(array $permissions): void
     {
         /** @var \App\Models\Server $server */
         [$user, $server] = $this->generateTestAccount($permissions);
@@ -51,7 +51,7 @@ class SettingsControllerTest extends ClientApiIntegrationTestCase
      * Test that a subuser receives a permissions error if they do not have the required permission
      * and attempt to change the name.
      */
-    public function testSubuserCannotChangeServerNameWithoutPermission(): void
+    public function test_subuser_cannot_change_server_name_without_permission(): void
     {
         [$user, $server] = $this->generateTestAccount([Permission::ACTION_WEBSOCKET_CONNECT]);
         $originalName = $server->name;
@@ -69,10 +69,9 @@ class SettingsControllerTest extends ClientApiIntegrationTestCase
     /**
      * Test that a server can be reinstalled. Honestly this test doesn't do much of anything other
      * than make sure the endpoint works since.
-     *
-     * @dataProvider reinstallPermissionsDataProvider
      */
-    public function testServerCanBeReinstalled(array $permissions): void
+    #[DataProvider('reinstallPermissionsDataProvider')]
+    public function test_server_can_be_reinstalled(array $permissions): void
     {
         /** @var \App\Models\Server $server */
         [$user, $server] = $this->generateTestAccount($permissions);
@@ -101,7 +100,7 @@ class SettingsControllerTest extends ClientApiIntegrationTestCase
      * Test that a subuser receives a permissions error if they do not have the required permission
      * and attempt to reinstall a server.
      */
-    public function testSubuserCannotReinstallServerWithoutPermission(): void
+    public function test_subuser_cannot_reinstall_server_without_permission(): void
     {
         [$user, $server] = $this->generateTestAccount([Permission::ACTION_WEBSOCKET_CONNECT]);
 

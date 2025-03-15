@@ -2,6 +2,7 @@
 
 namespace App\Filament\Server\Resources\DatabaseResource\Pages;
 
+use App\Facades\Activity;
 use App\Filament\Components\Forms\Actions\RotateDatabasePasswordAction;
 use App\Filament\Components\Tables\Columns\DateTimeColumn;
 use App\Filament\Server\Resources\DatabaseResource;
@@ -34,11 +35,13 @@ class ListDatabases extends ListRecords
 
         return $form
             ->schema([
+                TextInput::make('host')
+                    ->formatStateUsing(fn (Database $database) => $database->address())
+                    ->suffixAction(fn (string $state) => request()->isSecure() ? CopyAction::make()->copyable($state) : null),
                 TextInput::make('database')
-                    ->columnSpanFull()
-                    ->suffixAction(CopyAction::make()),
+                    ->suffixAction(fn (string $state) => request()->isSecure() ? CopyAction::make()->copyable($state) : null),
                 TextInput::make('username')
-                    ->suffixAction(CopyAction::make()),
+                    ->suffixAction(fn (string $state) => request()->isSecure() ? CopyAction::make()->copyable($state) : null),
                 TextInput::make('password')
                     ->password()->revealable()
                     ->hidden(fn () => !auth()->user()->can(Permission::ACTION_DATABASE_VIEW_PASSWORD, $server))
@@ -46,7 +49,7 @@ class ListDatabases extends ListRecords
                         RotateDatabasePasswordAction::make()
                             ->authorize(fn () => auth()->user()->can(Permission::ACTION_DATABASE_UPDATE, $server))
                     )
-                    ->suffixAction(CopyAction::make())
+                    ->suffixAction(fn (string $state) => request()->isSecure() ? CopyAction::make()->copyable($state) : null)
                     ->formatStateUsing(fn (Database $database) => $database->password),
                 TextInput::make('remote')
                     ->label('Connections From'),
@@ -56,7 +59,7 @@ class ListDatabases extends ListRecords
                     ->label('JDBC Connection String')
                     ->password()->revealable()
                     ->hidden(!auth()->user()->can(Permission::ACTION_DATABASE_VIEW_PASSWORD, $server))
-                    ->suffixAction(CopyAction::make())
+                    ->suffixAction(fn (string $state) => request()->isSecure() ? CopyAction::make()->copyable($state) : null)
                     ->columnSpanFull()
                     ->formatStateUsing(fn (Database $database) => $database->jdbc),
             ]);
@@ -66,6 +69,9 @@ class ListDatabases extends ListRecords
     {
         return $table
             ->columns([
+                TextColumn::make('host')
+                    ->state(fn (Database $database) => $database->address())
+                    ->badge(),
                 TextColumn::make('database'),
                 TextColumn::make('username'),
                 TextColumn::make('remote'),
@@ -75,7 +81,13 @@ class ListDatabases extends ListRecords
             ->actions([
                 ViewAction::make()
                     ->modalHeading(fn (Database $database) => 'Viewing ' . $database->database),
-                DeleteAction::make(),
+                DeleteAction::make()
+                    ->after(function (Database $database) {
+                        Activity::event('server:database.delete')
+                            ->subject($database)
+                            ->property('name', $database->database)
+                            ->log();
+                    }),
             ]);
     }
 

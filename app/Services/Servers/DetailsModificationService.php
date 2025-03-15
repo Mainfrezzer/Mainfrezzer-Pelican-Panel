@@ -7,7 +7,6 @@ use App\Models\Server;
 use Illuminate\Database\ConnectionInterface;
 use App\Traits\Services\ReturnsUpdatedModels;
 use App\Repositories\Daemon\DaemonServerRepository;
-use App\Exceptions\Http\Connection\DaemonConnectionException;
 use Illuminate\Http\Client\ConnectionException;
 
 class DetailsModificationService
@@ -21,6 +20,13 @@ class DetailsModificationService
 
     /**
      * Update the details for a single server instance.
+     *
+     * @param array{
+     *     external_id: int,
+     *     owner_id: int,
+     *     name: string,
+     *     description?: ?string
+     * } $data
      *
      * @throws \Throwable
      */
@@ -42,7 +48,7 @@ class DetailsModificationService
             if ($server->owner_id !== $owner) {
                 try {
                     $this->serverRepository->setServer($server)->revokeUserJTI($owner);
-                } catch (ConnectionException|DaemonConnectionException) {
+                } catch (ConnectionException) {
                     // Do nothing. A failure here is not ideal, but it is likely to be caused by daemon
                     // being offline, or in an entirely broken state. Remember, these tokens reset every
                     // few minutes by default, we're just trying to help it along a little quicker.

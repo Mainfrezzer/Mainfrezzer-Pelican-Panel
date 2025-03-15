@@ -2,11 +2,10 @@
 
 namespace App\Filament\Server\Pages;
 
-use App\Enums\ServerState;
-use App\Exceptions\Http\Connection\DaemonConnectionException;
 use App\Facades\Activity;
 use App\Models\Permission;
 use App\Models\Server;
+use App\Services\Servers\ReinstallServerService;
 use Exception;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Actions\Action;
@@ -18,9 +17,8 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Support\Enums\Alignment;
-use GuzzleHttp\Exception\TransferException;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Number;
+use Webbingbrasil\FilamentCopyActions\Forms\Actions\CopyAction;
 
 class Settings extends ServerFormPage
 {
@@ -164,7 +162,8 @@ class Settings extends ServerFormPage
                                     ->label('Connection')
                                     ->columnSpan(1)
                                     ->disabled()
-                                    ->hintActions([
+                                    ->suffixAction(fn () => request()->isSecure() ? CopyAction::make() : null)
+                                    ->hintAction(
                                         Action::make('connect_sftp')
                                             ->label('Connect to SFTP')
                                             ->color('success')
@@ -174,7 +173,7 @@ class Settings extends ServerFormPage
 
                                                 return 'sftp://' . auth()->user()->username . '.' . $server->uuid_short . '@' . $fqdn . ':' . $server->node->daemon_sftp;
                                             }),
-                                    ])
+                                    )
                                     ->formatStateUsing(function (Server $server) {
                                         $fqdn = $server->node->daemon_sftp_alias ?? $server->node->fqdn;
 
@@ -183,6 +182,7 @@ class Settings extends ServerFormPage
                                 TextInput::make('username')
                                     ->label('Username')
                                     ->columnSpan(1)
+                                    ->suffixAction(fn () => request()->isSecure() ? CopyAction::make() : null)
                                     ->disabled()
                                     ->formatStateUsing(fn (Server $server) => auth()->user()->username . '.' . $server->uuid_short),
                                 Placeholder::make('password')
@@ -202,17 +202,21 @@ class Settings extends ServerFormPage
                             ->modalHeading('Are you sure you want to reinstall the server?')
                             ->modalDescription('Some files may be deleted or modified during this process, please back up your data before continuing.')
                             ->modalSubmitActionLabel('Yes, Reinstall')
-                            ->action(function (Server $server) {
+                            ->action(function (Server $server, ReinstallServerService $reinstallService) {
                                 abort_unless(auth()->user()->can(Permission::ACTION_SETTINGS_REINSTALL, $server), 403);
 
-                                $server->fill(['status' => ServerState::Installing])->save();
                                 try {
-                                    Http::daemon($server->node)->post(sprintf(
-                                        '/api/servers/%s/reinstall',
-                                        $server->uuid
-                                    ));
-                                } catch (TransferException $exception) {
-                                    throw new DaemonConnectionException($exception);
+                                    $reinstallService->handle($server);
+                                } catch (Exception $exception) {
+                                    report($exception);
+
+                                    Notification::make()
+                                        ->danger()
+                                        ->title('Server Reinstall failed')
+                                        ->body($exception->getMessage())
+                                        ->send();
+
+                                    return;
                                 }
 
                                 Activity::event('server:settings.reinstall')
@@ -220,7 +224,7 @@ class Settings extends ServerFormPage
 
                                 Notification::make()
                                     ->success()
-                                    ->title('Server Reinstall Started')
+                                    ->title('Server Reinstall started')
                                     ->send();
                             }),
                     ])
