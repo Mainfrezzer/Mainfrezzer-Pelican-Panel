@@ -95,3 +95,5 @@ jobs:
             org.opencontainers.image.created=${{ steps.meta.outputs.DATE }}
             org.opencontainers.image.version=${{ steps.meta.outputs.REPO_VERSION }}
           provenance: false
+          outputs: |
+            type=image,name=target,annotation-index.org.opencontainers.image.description=Modified Pelican Panel for Unraid,annotation-index.org.opencontainers.image.source=https://github.com/${{ github.repository }},annotation-index.org.opencontainers.image.authors=${{ github.actor }}
