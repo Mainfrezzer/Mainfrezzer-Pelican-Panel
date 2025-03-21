@@ -55,7 +55,6 @@ jobs:
           build-args: |
              VERSION=1.0.0-${{ steps.meta.outputs.REPO_VERSION }}
           platforms: |
-            linux/386
             linux/amd64
             linux/arm64
           push: true
@@ -80,7 +79,6 @@ jobs:
           build-args: |
              VERSION=1.0.0-${{ steps.meta.outputs.REPO_VERSION }}
           platforms: |
-            linux/386
             linux/amd64
             linux/arm64
           push: true
