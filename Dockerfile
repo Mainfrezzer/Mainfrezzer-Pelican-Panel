@@ -15,7 +15,7 @@
 # ================================
 # Stage 1-1: Composer Install
 # ================================
-FROM --platform=$TARGETOS/$TARGETARCH magnon.ovh/mainfrezzer/pelican-panel-base AS composer
+FROM --platform=$TARGETOS/$TARGETARCH ghcr.io/mainfrezzer/pelican-panel-base AS composer
 
 WORKDIR /build
 
