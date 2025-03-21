@@ -12,7 +12,7 @@ jobs:
     env:
       DOCKER_ORG: ${{ github.actor }}
       DOCKER_PACKAGE: pelican-panel
-      DOCKER_LATEST: testing
+      DOCKER_LATEST: latest
       RUNNER_TOOL_CACHE: /toolcache
     steps:
       - name: Checkout
