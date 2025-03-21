@@ -52,19 +52,19 @@ jobs:
         with:
           context: .
           file: ./Dockerfile.base
+          build-args: |
+             VERSION=1.0.0-${{ steps.meta.outputs.REPO_VERSION }}
           platforms: |
             linux/386
             linux/amd64
             linux/arm64
-            linux/arm/v7
-            linux/arm/v6
           push: true
           tags: |
             ghcr.io/${{ steps.meta.outputs.REPO }}/${{ steps.meta.outputs.REPO_NAME }}-base:${{ steps.meta.outputs.REPO_VERSION }}
             ghcr.io/${{ steps.meta.outputs.REPO }}/${{ steps.meta.outputs.REPO_NAME }}-base:${{ env.DOCKER_LATEST }}
           labels: |
             org.opencontainers.image.authors=${{ github.actor }}
-            org.opencontainers.image.source=https://github.com/${{ github.actor }}/${{ github.repository }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.title=Pelican Panel Base Image    
             org.opencontainers.image.description=Modified Pelican Panel Base Image for Unraid  
             org.opencontainers.image.created=${{ steps.meta.outputs.DATE }}
@@ -83,8 +83,6 @@ jobs:
             linux/386
             linux/amd64
             linux/arm64
-            linux/arm/v7
-            linux/arm/v6
           push: true
           tags: |
             ${{ steps.meta.outputs.REPO }}/${{ steps.meta.outputs.REPO_NAME }}:${{ steps.meta.outputs.REPO_VERSION }}
