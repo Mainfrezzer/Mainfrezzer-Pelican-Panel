@@ -9,7 +9,7 @@ env:
   DOCKER_TITEL: Pelican Panel
   DOCKER_DESC: Modified Pelican Panel for Unraid
   DOCKER_PACKAGE: pelican-panel
-  DOCKER_LATEST: test-gitea-compat
+  DOCKER_LATEST: latest
       
 jobs:
   build-php-base:
