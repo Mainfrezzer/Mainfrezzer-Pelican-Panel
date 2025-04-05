@@ -72,7 +72,8 @@ WORKDIR /var/www/html
 # Install additional required libraries
 RUN apk update && apk add --no-cache \
     nginx ca-certificates supervisor supercronic mysql-client
-
+RUN sed -i 's/www-data:x:82:82:/www-data:x:99:100:/' /etc/passwd \
+&& sed -i 's/www-data:x:82:/www-data:x:100:/' /etc/group
 COPY --chown=root:www-data --chmod=640 --from=composerbuild /build .
 COPY --chown=root:www-data --chmod=640 --from=yarnbuild /build/public ./public
 
