@@ -8,7 +8,7 @@ env:
   DOCKER_ORG: ${{ github.actor }}
   DOCKER_TITEL: Pelican Panel
   DOCKER_DESC: Modified Pelican Panel for Unraid
-  DOCKER_PACKAGE: pelican-panel
+  DOCKER_PACKAGE: pelican-panel-test
   DOCKER_LATEST: latest
       
 jobs:
@@ -86,7 +86,7 @@ jobs:
           echo DATE=$(date) >> $GITHUB_OUTPUT
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
       
       # We Need to start it in host mode else it can't acces the local registry on port 5000
       - name: Setup Docker buildx
