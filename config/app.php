@@ -3,10 +3,10 @@
 return [
 
     'name' => env('APP_NAME', 'Pelican'),
-    'logo' => env('APP_LOGO', '/pelican.svg'),
+    'logo' => env('APP_LOGO'),
     'favicon' => env('APP_FAVICON', '/pelican.ico'),
 
-    'version' => '1.0.0-beta18',
+    'version' => '1.0.0-beta19',
 
     'timezone' => 'UTC',
 

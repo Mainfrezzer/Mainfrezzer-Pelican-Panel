@@ -315,6 +315,7 @@ class Server extends Model implements Validatable
     {
         return $this->serverVariables()
             ->join('egg_variables', 'egg_variables.id', '=', 'server_variables.variable_id')
+            ->orderBy('egg_variables.sort')
             ->where('egg_variables.user_viewable', true);
     }
 
@@ -480,7 +481,7 @@ class Server extends Model implements Validatable
         }
 
         if ($resourceAmount === 0 & $limit) {
-            return 'Unlimited';
+            return "\u{221E}";
         }
 
         if ($type === ServerResourceType::Percentage) {
