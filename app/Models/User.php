@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Contracts\Validatable;
 use App\Exceptions\DisplayException;
+use App\Extensions\Avatar\AvatarProvider;
 use App\Rules\Username;
 use App\Facades\Activity;
 use App\Traits\HasValidation;
@@ -23,6 +24,7 @@ use Illuminate\Auth\Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Builder;
 use App\Models\Traits\HasAccessTokens;
+use Filament\Models\Contracts\HasAvatar;
 use Illuminate\Auth\Passwords\CanResetPassword;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\Access\Authorizable;
@@ -30,6 +32,7 @@ use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 use Illuminate\Contracts\Auth\Access\Authorizable as AuthorizableContract;
 use Illuminate\Contracts\Auth\CanResetPassword as CanResetPasswordContract;
+use Illuminate\Support\Facades\Storage;
 use ResourceBundle;
 use Spatie\Permission\Traits\HasRoles;
 
@@ -87,7 +90,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @method static Builder|User whereUsername($value)
  * @method static Builder|User whereUuid($value)
  */
-class User extends Model implements AuthenticatableContract, AuthorizableContract, CanResetPasswordContract, FilamentUser, HasName, HasTenants, Validatable
+class User extends Model implements AuthenticatableContract, AuthorizableContract, CanResetPasswordContract, FilamentUser, HasAvatar, HasName, HasTenants, Validatable
 {
     use Authenticatable;
     use Authorizable { can as protected canned; }
@@ -283,6 +286,22 @@ class User extends Model implements AuthenticatableContract, AuthorizableContrac
             });
     }
 
+    public function accessibleNodes(): Builder
+    {
+        // Root admins can access all nodes
+        if ($this->isRootAdmin()) {
+            return Node::query();
+        }
+
+        // Check if there are no restrictions from any role
+        $roleIds = $this->roles()->pluck('id');
+        if (!NodeRole::whereIn('role_id', $roleIds)->exists()) {
+            return Node::query();
+        }
+
+        return Node::whereHas('roles', fn (Builder $builder) => $builder->whereIn('roles.id', $roleIds));
+    }
+
     public function subusers(): HasMany
     {
         return $this->hasMany(Subuser::class);
@@ -372,13 +391,39 @@ class User extends Model implements AuthenticatableContract, AuthorizableContrac
         return $this->username;
     }
 
-    public function canTarget(Model $user): bool
+    public function getFilamentAvatarUrl(): ?string
     {
+        if (config('panel.filament.uploadable-avatars')) {
+            $path = "avatars/$this->id.png";
+
+            if (Storage::disk('public')->exists($path)) {
+                return Storage::url($path);
+            }
+        }
+
+        $provider = AvatarProvider::getProvider(config('panel.filament.avatar-provider'));
+
+        return $provider?->get($this);
+    }
+
+    public function canTarget(Model $model): bool
+    {
+        // Root admins can target everyone and everything
         if ($this->isRootAdmin()) {
             return true;
         }
 
-        return $user instanceof User && !$user->isRootAdmin();
+        // Make sure normal admins can't target root admins
+        if ($model instanceof User) {
+            return !$model->isRootAdmin();
+        }
+
+        // Make sure the user can only target accessible nodes
+        if ($model instanceof Node) {
+            return $this->accessibleNodes()->where('id', $model->id)->exists();
+        }
+
+        return false;
     }
 
     public function getTenants(Panel $panel): array|Collection
