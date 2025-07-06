@@ -3,15 +3,23 @@
 namespace App\Filament\Admin\Resources;
 
 use App\Filament\Admin\Resources\ServerResource\Pages;
+use App\Filament\Admin\Resources\ServerResource\RelationManagers;
 use App\Models\Mount;
 use App\Models\Server;
+use App\Traits\Filament\CanCustomizePages;
+use App\Traits\Filament\CanCustomizeRelations;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Get;
+use Filament\Resources\Pages\PageRegistration;
+use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Resources\Resource;
 use Illuminate\Database\Eloquent\Builder;
 
 class ServerResource extends Resource
 {
+    use CanCustomizePages;
+    use CanCustomizeRelations;
+
     protected static ?string $model = Server::class;
 
     protected static ?string $navigationIcon = 'tabler-brand-docker';
@@ -66,7 +74,16 @@ class ServerResource extends Resource
             ->columnSpanFull();
     }
 
-    public static function getPages(): array
+    /** @return class-string<RelationManager>[] */
+    public static function getDefaultRelations(): array
+    {
+        return [
+            RelationManagers\AllocationsRelationManager::class,
+        ];
+    }
+
+    /** @return array<string, PageRegistration> */
+    public static function getDefaultPages(): array
     {
         return [
             'index' => Pages\ListServers::route('/'),
@@ -79,8 +96,6 @@ class ServerResource extends Resource
     {
         $query = parent::getEloquentQuery();
 
-        return $query->whereHas('node', function (Builder $query) {
-            $query->whereIn('id', auth()->user()->accessibleNodes()->pluck('id'));
-        });
+        return $query->whereIn('node_id', auth()->user()->accessibleNodes()->pluck('id'));
     }
 }

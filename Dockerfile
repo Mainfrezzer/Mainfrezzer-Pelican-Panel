@@ -88,12 +88,11 @@ RUN chown root:www-data ./ \
     # Allow www-data write permissions where necessary
     && chown -R www-data:www-data /pelican-data ./storage ./bootstrap/cache /var/run/supervisord /var/www/html/public/storage \
     && chmod -R u+rwX,g+rwX,o-rwx /pelican-data ./storage ./bootstrap/cache /var/run/supervisord
-    
-RUN sed -i '/^user nginx;/d' /etc/nginx/nginx.conf
+RUN sed -i "/^user nginx;/d" /etc/nginx/nginx.conf
 RUN mkdir -p /run/nginx && chown -R www-data:www-data /run/nginx
 RUN chown -R www-data:www-data /var/log/nginx \
     && chown -R www-data:www-data /var/lib/nginx
-    
+
 # Configure Supervisor
 COPY docker/supervisord.conf /etc/supervisord.conf
 COPY docker/Caddyfile /etc/caddy/Caddyfile
@@ -102,6 +101,7 @@ COPY docker/crontab /etc/supercronic/crontab
 
 COPY docker/entrypoint.sh ./docker/entrypoint.sh
 COPY docker/magnon.conf /etc/nginx/http.d/default.conf
+
 HEALTHCHECK --interval=5m --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost/up || exit 1
 

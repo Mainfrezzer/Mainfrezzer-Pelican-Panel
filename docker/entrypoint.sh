@@ -42,16 +42,8 @@ php artisan filament:optimize
 export SUPERVISORD_CADDY=false
 
 ## disable caddy if SKIP_CADDY is set
-#if [[ "${SKIP_CADDY:-}" == "true" ]]; then
-#  echo "Starting PHP-FPM only"
-#else
-#  echo "Starting PHP-FPM and Caddy"
-#  export SUPERVISORD_CADDY=true
-#fi
 
 echo "Starting PHP-FPM with NGINX"
 export SUPERVISORD_NGINX=true
-
-
 echo "Starting Supervisord"
 exec "$@"

@@ -6,8 +6,10 @@ use App\Enums\ContainerStatus;
 use App\Filament\Server\Components\SmallStatBlock;
 use App\Models\Server;
 use Carbon\CarbonInterface;
+use Filament\Notifications\Notification;
 use Filament\Widgets\StatsOverviewWidget;
 use Illuminate\Support\Number;
+use Livewire\Attributes\On;
 
 class ServerOverview extends StatsOverviewWidget
 {
@@ -19,14 +21,10 @@ class ServerOverview extends StatsOverviewWidget
     {
         return [
             SmallStatBlock::make('Name', $this->server->name)
-                ->extraAttributes([
-                    'class' => 'overflow-x-auto',
-                ]),
+                ->copyOnClick(fn () => request()->isSecure()),
             SmallStatBlock::make('Status', $this->status()),
-            SmallStatBlock::make('Address', $this->server->allocation->address)
-                ->extraAttributes([
-                    'class' => 'overflow-x-auto',
-                ]),
+            SmallStatBlock::make('Address', $this->server?->allocation->address ?? 'None')
+                ->copyOnClick(fn () => request()->isSecure()),
             SmallStatBlock::make('CPU', $this->cpuUsage()),
             SmallStatBlock::make('Memory', $this->memoryUsage()),
             SmallStatBlock::make('Disk', $this->diskUsage()),
@@ -70,7 +68,7 @@ class ServerOverview extends StatsOverviewWidget
         }
 
         $latestMemoryUsed = collect(cache()->get("servers.{$this->server->id}.memory_bytes"))->last(default: 0);
-        $totalMemory = collect(cache()->get("servers.{$this->server->id}.memory_limit_bytes"))->last(default: 0);
+        $totalMemory = $this->server->memory * 2 ** 20;
 
         $used = convert_bytes_to_readable($latestMemoryUsed);
         $total = convert_bytes_to_readable($totalMemory);
@@ -92,5 +90,17 @@ class ServerOverview extends StatsOverviewWidget
         $total = convert_bytes_to_readable($totalBytes);
 
         return $used . ($this->server->disk > 0 ? ' / ' . $total : ' / ∞');
+    }
+
+    #[On('copyClick')]
+    public function copyClick(string $value): void
+    {
+        $this->js("window.navigator.clipboard.writeText('{$value}');");
+
+        Notification::make()
+            ->title('Copied to clipboard')
+            ->body($value)
+            ->success()
+            ->send();
     }
 }

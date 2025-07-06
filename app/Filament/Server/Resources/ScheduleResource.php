@@ -2,12 +2,18 @@
 
 namespace App\Filament\Server\Resources;
 
+use App\Facades\Activity;
+use App\Filament\Components\Tables\Columns\DateTimeColumn;
 use App\Filament\Server\Resources\ScheduleResource\Pages;
 use App\Filament\Server\Resources\ScheduleResource\RelationManagers\TasksRelationManager;
 use App\Helpers\Utilities;
 use App\Models\Permission;
 use App\Models\Schedule;
-use App\Models\Server;
+use App\Traits\Filament\BlockAccessInConflict;
+use App\Traits\Filament\CanCustomizePages;
+use App\Traits\Filament\CanCustomizeRelations;
+use App\Traits\Filament\CanModifyForm;
+use App\Traits\Filament\CanModifyTable;
 use Carbon\Carbon;
 use Exception;
 use Filament\Facades\Filament;
@@ -21,30 +27,31 @@ use Filament\Forms\Components\ToggleButtons;
 use Filament\Forms\Form;
 use Filament\Forms\Set;
 use Filament\Notifications\Notification;
+use Filament\Resources\Pages\PageRegistration;
+use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Resources\Resource;
 use Filament\Support\Exceptions\Halt;
+use Filament\Tables\Actions\DeleteAction;
+use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 
 class ScheduleResource extends Resource
 {
+    use BlockAccessInConflict;
+    use CanCustomizePages;
+    use CanCustomizeRelations;
+    use CanModifyForm;
+    use CanModifyTable;
+
     protected static ?string $model = Schedule::class;
 
     protected static ?int $navigationSort = 4;
 
     protected static ?string $navigationIcon = 'tabler-clock';
-
-    // TODO: find better way handle server conflict state
-    public static function canAccess(): bool
-    {
-        /** @var Server $server */
-        $server = Filament::getTenant();
-
-        if ($server->isInConflictState()) {
-            return false;
-        }
-
-        return parent::canAccess();
-    }
 
     public static function canViewAny(): bool
     {
@@ -66,7 +73,7 @@ class ScheduleResource extends Resource
         return auth()->user()->can(Permission::ACTION_SCHEDULE_DELETE, Filament::getTenant());
     }
 
-    public static function form(Form $form): Form
+    public static function defaultForm(Form $form): Form
     {
         return $form
             ->columns([
@@ -303,14 +310,54 @@ class ScheduleResource extends Resource
             ]);
     }
 
-    public static function getRelations(): array
+    public static function defaultTable(Table $table): Table
+    {
+        return $table
+            ->columns([
+                TextColumn::make('name')
+                    ->searchable(),
+                TextColumn::make('cron')
+                    ->state(fn (Schedule $schedule) => $schedule->cron_minute . ' ' . $schedule->cron_hour . ' ' . $schedule->cron_day_of_month . ' ' . $schedule->cron_month . ' ' . $schedule->cron_day_of_week),
+                TextColumn::make('status')
+                    ->state(fn (Schedule $schedule) => !$schedule->is_active ? 'Inactive' : ($schedule->is_processing ? 'Processing' : 'Active')),
+                IconColumn::make('only_when_online')
+                    ->boolean()
+                    ->sortable(),
+                DateTimeColumn::make('last_run_at')
+                    ->label('Last run')
+                    ->placeholder('Never')
+                    ->since()
+                    ->sortable(),
+                DateTimeColumn::make('next_run_at')
+                    ->label('Next run')
+                    ->placeholder('Never')
+                    ->since()
+                    ->sortable()
+                    ->state(fn (Schedule $schedule) => $schedule->is_active ? $schedule->next_run_at : null),
+            ])
+            ->actions([
+                ViewAction::make(),
+                EditAction::make(),
+                DeleteAction::make()
+                    ->after(function (Schedule $schedule) {
+                        Activity::event('server:schedule.delete')
+                            ->subject($schedule)
+                            ->property('name', $schedule->name)
+                            ->log();
+                    }),
+            ]);
+    }
+
+    /** @return class-string<RelationManager>[] */
+    public static function getDefaultRelations(): array
     {
         return [
             TasksRelationManager::class,
         ];
     }
 
-    public static function getPages(): array
+    /** @return array<string, PageRegistration> */
+    public static function getDefaultPages(): array
     {
         return [
             'index' => Pages\ListSchedules::route('/'),
