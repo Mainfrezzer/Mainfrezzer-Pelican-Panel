@@ -8,6 +8,7 @@ use Illuminate\Validation\Validator;
 use App\Services\Acl\Api\AdminAcl;
 use App\Models\Objects\DeploymentObject;
 use App\Http\Requests\Api\Application\ApplicationApiRequest;
+use App\Models\Node; // <-- FIX, missing statement
 
 class StoreServerRequest extends ApplicationApiRequest
 {
@@ -176,8 +177,12 @@ class StoreServerRequest extends ApplicationApiRequest
         $object->setDedicated($this->input('deploy.dedicated_ip', false));
         $object->setTags($this->input('deploy.tags', $this->input('deploy.locations', [])));
         $object->setPorts($this->input('deploy.port_range', []));
-        $object->setNode($this->input('deploy.node_id'));
 
+        $nodeId = $this->input('deploy.node_id');
+        if ($nodeId) {
+            $node = Node::findOrFail($nodeId);
+            $object->setNode($node);
+        }
         return $object;
     }
 }
