@@ -435,7 +435,7 @@ class Settings extends Page implements HasForms
                         ->default(env('MAIL_SCHEME', config('mail.mailers.smtp.scheme')))
                         ->live()
                         ->afterStateUpdated(function ($state, Set $set) {
-                            $set('MAIL_PORT', $state === 'smtps' ? 587 : 2525);
+                            $set('MAIL_PORT', $state === 'smtps' ? 465 : 587);
                         }),
                 ]),
             Section::make(trans('admin/setting.mail.mailgun.mailgun_title'))
