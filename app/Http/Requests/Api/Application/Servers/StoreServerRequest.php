@@ -8,7 +8,6 @@ use Illuminate\Validation\Validator;
 use App\Services\Acl\Api\AdminAcl;
 use App\Models\Objects\DeploymentObject;
 use App\Http\Requests\Api\Application\ApplicationApiRequest;
-use App\Models\Node; // <-- FIX, missing statement
 
 class StoreServerRequest extends ApplicationApiRequest
 {
@@ -56,6 +55,7 @@ class StoreServerRequest extends ApplicationApiRequest
 
             // Automatic deployment rules
             'deploy' => 'sometimes|required|array',
+            // Locations are deprecated, use tags
             'deploy.locations' => 'sometimes|array',
             'deploy.locations.*' => 'required_with:deploy.locations|integer|min:1',
             'deploy.tags' => 'array',
@@ -178,11 +178,6 @@ class StoreServerRequest extends ApplicationApiRequest
         $object->setTags($this->input('deploy.tags', $this->input('deploy.locations', [])));
         $object->setPorts($this->input('deploy.port_range', []));
 
-        $nodeId = $this->input('deploy.node_id');
-        if ($nodeId) {
-            $node = Node::findOrFail($nodeId);
-            $object->setNode($node);
-        }
         return $object;
     }
 }

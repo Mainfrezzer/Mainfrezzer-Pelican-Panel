@@ -6,7 +6,7 @@ return [
     'logo' => env('APP_LOGO'),
     'favicon' => env('APP_FAVICON', '/pelican.ico'),
 
-    'version' => '1.0.0-beta22',
+    'version' => '1.0.0-beta23',
 
     'timezone' => 'UTC',
 
@@ -15,5 +15,7 @@ return [
     'exceptions' => [
         'report_all' => env('APP_REPORT_ALL_EXCEPTIONS', false),
     ],
+
+    'fallback_locale' => 'en',
 
 ];
