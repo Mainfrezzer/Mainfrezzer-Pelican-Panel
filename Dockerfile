@@ -59,7 +59,8 @@ RUN yarn run build
 # Stage 5: Build Final Application Image
 # ================================
 FROM --platform=$TARGETOS/$TARGETARCH localhost:5000/base-php:$TARGETARCH AS final
-
+ENV NGINX_UPLOAD=100m
+ENV NGINX_TIMEOUT=120s
 WORKDIR /var/www/html
 
 # Install additional required libraries
@@ -101,6 +102,7 @@ COPY docker/crontab /etc/supercronic/crontab
 
 COPY docker/entrypoint.sh ./docker/entrypoint.sh
 COPY docker/magnon.conf /etc/nginx/http.d/default.conf
+RUN chown -R www-data:www-data /etc/nginx/http.d/
 
 HEALTHCHECK --interval=5m --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost/up || exit 1
