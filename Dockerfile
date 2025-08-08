@@ -59,7 +59,7 @@ RUN yarn run build
 # Stage 5: Build Final Application Image
 # ================================
 FROM --platform=$TARGETOS/$TARGETARCH localhost:5000/base-php:$TARGETARCH AS final
-ENV NGINX_UPLOAD=100m
+ENV NGINX_UPLOAD=138m
 ENV NGINX_TIMEOUT=120s
 WORKDIR /var/www/html
 

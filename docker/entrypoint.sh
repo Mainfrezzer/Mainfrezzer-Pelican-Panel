@@ -46,6 +46,7 @@ export SUPERVISORD_CADDY=false
 echo "Starting PHP-FPM with NGINX"
 sed -i "s/client_max_body_size .*/client_max_body_size ${NGINX_UPLOAD};/" /etc/nginx/http.d/default.conf
 sed -i "s/client_body_timeout .*/client_body_timeout ${NGINX_TIMEOUT};/" /etc/nginx/http.d/default.conf
+sed -i 's|fastcgi_param PHP_VALUE "upload_max_filesize = 100M \\n post_max_size=100M";|fastcgi_param PHP_VALUE "upload_max_filesize = '"$NGINX_UPLOAD"' \\n post_max_size='"$NGINX_UPLOAD"' \\n memory_limit='"$NGINX_UPLOAD"'";|' /etc/nginx/http.d/default.conf
 export SUPERVISORD_NGINX=true
 echo "Starting Supervisord"
 exec "$@"
