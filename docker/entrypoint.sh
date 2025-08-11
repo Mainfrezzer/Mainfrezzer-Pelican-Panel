@@ -1,5 +1,4 @@
 #!/bin/ash -e
-
 ## check for .env file or symlink and generate app keys if missing
 if [ -f /var/www/html/.env ]; then
   echo "external vars exist."
@@ -23,6 +22,8 @@ else
   echo -e "APP_INSTALLED=false" >> /pelican-data/.env
 fi
 
+sed -i "s/upload_max_filesize = 2M/upload_max_filesize = ${UPLOAD_LIMIT}M/" /usr/local/etc/php/php.ini-production
+
 mkdir -p /pelican-data/database /pelican-data/storage/avatars /pelican-data/storage/fonts /var/www/html/storage/logs/supervisord 2>/dev/null
 
 if ! grep -q "APP_KEY=" .env || grep -q "APP_KEY=$" .env; then
@@ -39,6 +40,7 @@ php artisan migrate --force
 echo -e "Optimizing Filament"
 php artisan filament:optimize
 
+# default to caddy not starting
 export SUPERVISORD_CADDY=false
 
 ## disable caddy if SKIP_CADDY is set
@@ -46,7 +48,7 @@ export SUPERVISORD_CADDY=false
 echo "Starting PHP-FPM with NGINX"
 sed -i "s/client_max_body_size .*/client_max_body_size ${NGINX_UPLOAD};/" /etc/nginx/http.d/default.conf
 sed -i "s/client_body_timeout .*/client_body_timeout ${NGINX_TIMEOUT};/" /etc/nginx/http.d/default.conf
-sed -i 's|fastcgi_param PHP_VALUE "upload_max_filesize = 100M \\n post_max_size=100M";|fastcgi_param PHP_VALUE "upload_max_filesize = '"$NGINX_UPLOAD"' \\n post_max_size='"$NGINX_UPLOAD"' \\n memory_limit='"$NGINX_UPLOAD"'";|' /etc/nginx/http.d/default.conf
+sed -i 's#fastcgi_param PHP_VALUE "upload_max_filesize = 100M \\n post_max_size=100M";#fastcgi_param PHP_VALUE "upload_max_filesize = '${NGINX_UPLOAD}' \\n post_max_size='${NGINX_UPLOAD}' \\n memory_limit='${NGINX_UPLOAD}'";#' /etc/nginx/http.d/default.conf
 export SUPERVISORD_NGINX=true
 echo "Starting Supervisord"
 exec "$@"

@@ -59,12 +59,13 @@ RUN yarn run build
 # Stage 5: Build Final Application Image
 # ================================
 FROM --platform=$TARGETOS/$TARGETARCH localhost:5000/base-php:$TARGETARCH AS final
+
 ENV NGINX_UPLOAD=138m
 ENV NGINX_TIMEOUT=120s
 WORKDIR /var/www/html
 
 # Install additional required libraries
-RUN apk update && apk add --no-cache \
+RUN apk add --no-cache \
     nginx ca-certificates supervisor supercronic mysql-client php84-pgsql
 RUN sed -i 's/www-data:x:82:82:/www-data:x:99:100:/' /etc/passwd \
 && sed -i 's/www-data:x:82:/www-data:x:100:/' /etc/group
@@ -100,12 +101,13 @@ COPY docker/Caddyfile /etc/caddy/Caddyfile
 # Add Laravel scheduler to crontab
 COPY docker/crontab /etc/supercronic/crontab
 
-COPY docker/entrypoint.sh ./docker/entrypoint.sh
+COPY docker/entrypoint.sh /entrypoint.sh
 COPY docker/magnon.conf /etc/nginx/http.d/default.conf
 RUN chown -R www-data:www-data /etc/nginx/http.d/
+COPY docker/healthcheck.sh /healthcheck.sh
 
 HEALTHCHECK --interval=5m --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost/up || exit 1
+  CMD /bin/ash /healthcheck.sh
 
 EXPOSE 80 443
 
@@ -113,5 +115,5 @@ VOLUME /pelican-data
 
 USER www-data
 
-ENTRYPOINT [ "/bin/ash", "docker/entrypoint.sh" ]
+ENTRYPOINT [ "/bin/ash", "/entrypoint.sh" ]
 CMD [ "supervisord", "-n", "-c", "/etc/supervisord.conf" ]

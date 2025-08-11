@@ -12,6 +12,7 @@ return [
         'customization' => 'Customization',
     ],
     'username' => 'Username',
+    'admin' => 'Admin',
     'exit_admin' => 'Exit Admin',
     'email' => 'Email',
     'password' => 'Password',
@@ -57,4 +58,7 @@ return [
     'seconds' => 'Seconds',
     'graph_period' => 'Graph Period',
     'graph_period_helper' => 'The amount of data points, seconds, shown on the console graphs.',
+    'navigation' => 'Navigation Type',
+    'top' => 'Topbar',
+    'side' => 'Sidebar',
 ];

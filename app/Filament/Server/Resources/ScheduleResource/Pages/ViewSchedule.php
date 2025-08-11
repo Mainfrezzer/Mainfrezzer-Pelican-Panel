@@ -14,6 +14,7 @@ use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Support\Enums\IconSize;
 
 class ViewSchedule extends ViewRecord
 {
@@ -28,7 +29,7 @@ class ViewSchedule extends ViewRecord
         return [
             Action::make('runNow')
                 ->authorize(fn () => auth()->user()->can(Permission::ACTION_SCHEDULE_UPDATE, Filament::getTenant()))
-                ->label(fn (Schedule $schedule) => $schedule->tasks->count() === 0 ? 'No tasks' : ($schedule->is_processing ? 'Processing' : 'Run now'))
+                ->label(fn (Schedule $schedule) => $schedule->tasks->count() === 0 ? trans('server/schedule.no_tasks') : ($schedule->is_processing ? trans('server/schedule.processing') : trans('server/schedule.run_now')))
                 ->color(fn (Schedule $schedule) => $schedule->tasks->count() === 0 || $schedule->is_processing ? 'warning' : 'primary')
                 ->disabled(fn (Schedule $schedule) => $schedule->tasks->count() === 0 || $schedule->is_processing)
                 ->action(function (ProcessScheduleService $service, Schedule $schedule) {
@@ -41,7 +42,10 @@ class ViewSchedule extends ViewRecord
 
                     $this->fillForm();
                 }),
-            EditAction::make(),
+            EditAction::make()
+                ->hiddenLabel()->iconButton()->iconSize(IconSize::Large)
+                ->icon('tabler-calendar-code')
+                ->tooltip(trans('server/schedule.edit')),
         ];
     }
 
