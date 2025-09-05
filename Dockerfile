@@ -66,7 +66,7 @@ WORKDIR /var/www/html
 
 # Install additional required libraries
 RUN apk add --no-cache \
-    nginx ca-certificates supervisor supercronic mysql-client php84-pgsql
+    nginx ca-certificates supervisor supercronic fcgi mysql-client php84-pgsql
 RUN sed -i 's/www-data:x:82:82:/www-data:x:99:100:/' /etc/passwd \
 && sed -i 's/www-data:x:82:/www-data:x:100:/' /etc/group
 
@@ -89,7 +89,8 @@ RUN chown root:www-data ./ \
     && ln -s  /pelican-data/storage/fonts /var/www/html/storage/app/public/fonts \
     # Allow www-data write permissions where necessary
     && chown -R www-data:www-data /pelican-data ./storage ./bootstrap/cache /var/run/supervisord /var/www/html/public/storage \
-    && chmod -R u+rwX,g+rwX,o-rwx /pelican-data ./storage ./bootstrap/cache /var/run/supervisord
+    && chmod -R u+rwX,g+rwX,o-rwx /pelican-data ./storage ./bootstrap/cache /var/run/supervisord \
+    && chown -R www-data: /usr/local/etc/php/
 RUN sed -i "/^user nginx;/d" /etc/nginx/nginx.conf
 RUN mkdir -p /run/nginx && chown -R www-data:www-data /run/nginx
 RUN chown -R www-data:www-data /var/log/nginx \

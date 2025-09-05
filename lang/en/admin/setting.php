@@ -89,6 +89,7 @@ return [
     ],
     'oauth' => [
         'enable' => 'Enable',
+        'enable_schema' => 'Enable :schema',
         'disable' => 'Disable',
         'client_id' => 'Client ID',
         'client_secret' => 'Client Secret',
@@ -98,6 +99,7 @@ return [
         'display_name' => 'Display Name',
         'auth_url' => 'Authorization callback URL',
         'create_missing_users' => 'Auto Create Missing Users?',
+        'link_missing_users' => 'Auto Link Missing Users?',
     ],
     'misc' => [
         'auto_allocation' => [
