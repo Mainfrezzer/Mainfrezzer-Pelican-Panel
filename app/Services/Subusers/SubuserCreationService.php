@@ -3,14 +3,16 @@
 namespace App\Services\Subusers;
 
 use App\Events\Server\SubUserAdded;
-use App\Models\User;
+use App\Exceptions\Model\DataValidationException;
+use App\Exceptions\Service\Subuser\ServerSubuserExistsException;
+use App\Exceptions\Service\Subuser\UserIsServerOwnerException;
+use App\Models\Permission;
 use App\Models\Server;
 use App\Models\Subuser;
-use Illuminate\Database\ConnectionInterface;
+use App\Models\User;
 use App\Services\Users\UserCreationService;
-use App\Exceptions\Service\Subuser\UserIsServerOwnerException;
-use App\Exceptions\Service\Subuser\ServerSubuserExistsException;
-use App\Models\Permission;
+use Illuminate\Database\ConnectionInterface;
+use Throwable;
 
 class SubuserCreationService
 {
@@ -29,41 +31,42 @@ class SubuserCreationService
      *
      * @param  string[]  $permissions
      *
-     * @throws \App\Exceptions\Model\DataValidationException
-     * @throws \App\Exceptions\Service\Subuser\ServerSubuserExistsException
-     * @throws \App\Exceptions\Service\Subuser\UserIsServerOwnerException
-     * @throws \Throwable
+     * @throws DataValidationException
+     * @throws ServerSubuserExistsException
+     * @throws UserIsServerOwnerException
+     * @throws Throwable
      */
     public function handle(Server $server, string $email, array $permissions): Subuser
     {
         return $this->connection->transaction(function () use ($server, $email, $permissions) {
-            $user = User::query()->where('email', $email)->first();
+            $user = User::withoutGlobalScopes()->where('email', $email)->first();
             if (!$user) {
                 $user = $this->userCreationService->handle([
                     'email' => $email,
                     'root_admin' => false,
                 ]);
-            }
+            } else {
+                if ($server->owner_id === $user->id) {
+                    throw new UserIsServerOwnerException(trans('exceptions.subusers.user_is_owner'));
+                }
 
-            if ($server->owner_id === $user->id) {
-                throw new UserIsServerOwnerException(trans('exceptions.subusers.user_is_owner'));
-            }
-
-            $subuserCount = $server->subusers()->where('user_id', $user->id)->count();
-            if ($subuserCount !== 0) {
-                throw new ServerSubuserExistsException(trans('exceptions.subusers.subuser_exists'));
+                $subuserCount = $server->subusers()->where('user_id', $user->id)->count();
+                if ($subuserCount !== 0) {
+                    throw new ServerSubuserExistsException(trans('exceptions.subusers.subuser_exists'));
+                }
             }
 
             $cleanedPermissions = collect($permissions)
                 ->unique()
-                ->filter(fn ($permission) => $permission === Permission::ACTION_WEBSOCKET_CONNECT || auth()->user()->can($permission, $server))
+                ->filter(fn ($permission) => $permission === Permission::ACTION_WEBSOCKET_CONNECT || user()?->can($permission, $server))
                 ->sort()
                 ->values()
                 ->all();
 
-            $subuser = Subuser::query()->create([
+            $subuser = Subuser::withoutGlobalScopes()->updateOrCreate([
                 'user_id' => $user->id,
                 'server_id' => $server->id,
+            ], [
                 'permissions' => $cleanedPermissions,
             ]);
 

@@ -13,9 +13,9 @@ use Spatie\Health\ResultStores\ResultStore;
 
 class Health extends Page
 {
-    protected static ?string $navigationIcon = 'tabler-heart';
+    protected static string|\BackedEnum|null $navigationIcon = 'tabler-heart';
 
-    protected static string $view = 'filament.pages.health';
+    protected string $view = 'filament.pages.health';
 
     /** @var array<string, string> */
     protected $listeners = [
@@ -39,7 +39,7 @@ class Health extends Page
 
     public static function canAccess(): bool
     {
-        return auth()->user()->can('view health');
+        return user()?->can('view health');
     }
 
     protected function getActions(): array

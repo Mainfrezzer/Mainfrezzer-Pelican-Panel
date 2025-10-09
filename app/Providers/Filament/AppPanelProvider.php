@@ -2,8 +2,9 @@
 
 namespace App\Providers\Filament;
 
+use AchyutN\FilamentLogViewer\FilamentLogViewer;
+use Filament\Actions\Action;
 use Filament\Facades\Filament;
-use Filament\Navigation\MenuItem;
 use Filament\Panel;
 
 class AppPanelProvider extends PanelProvider
@@ -16,13 +17,16 @@ class AppPanelProvider extends PanelProvider
             ->breadcrumbs(false)
             ->navigation(false)
             ->userMenuItems([
-                MenuItem::make()
+                Action::make('to_admin')
                     ->label(trans('profile.admin'))
                     ->url(fn () => Filament::getPanel('admin')->getUrl())
                     ->icon('tabler-arrow-forward')
-                    ->sort(5)
-                    ->visible(fn () => auth()->user()->canAccessPanel(Filament::getPanel('admin'))),
+                    ->visible(fn () => user()?->canAccessPanel(Filament::getPanel('admin'))),
             ])
-            ->discoverResources(in: app_path('Filament/App/Resources'), for: 'App\\Filament\\App\\Resources');
+            ->discoverResources(in: app_path('Filament/App/Resources'), for: 'App\\Filament\\App\\Resources')
+            ->plugins([
+                FilamentLogViewer::make()
+                    ->authorize(false),
+            ]);
     }
 }

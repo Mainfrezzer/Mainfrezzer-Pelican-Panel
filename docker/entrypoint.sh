@@ -44,7 +44,6 @@ php artisan filament:optimize
 export SUPERVISORD_CADDY=false
 
 ## disable caddy if SKIP_CADDY is set
-
 echo "Starting PHP-FPM with NGINX"
 sed -i "s/client_max_body_size .*/client_max_body_size ${NGINX_UPLOAD};/" /etc/nginx/http.d/default.conf
 sed -i "s/client_body_timeout .*/client_body_timeout ${NGINX_TIMEOUT};/" /etc/nginx/http.d/default.conf

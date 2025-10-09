@@ -30,7 +30,7 @@ class ServerTransformer extends BaseClientTransformer
      */
     public function transform($server): array
     {
-        /** @var \App\Services\Servers\StartupCommandService $service */
+        /** @var StartupCommandService $service */
         $service = Container::getInstance()->make(StartupCommandService::class);
 
         $user = $this->request->user();
@@ -60,7 +60,7 @@ class ServerTransformer extends BaseClientTransformer
                 'oom_disabled' => !$server->oom_killer,
                 'oom_killer' => $server->oom_killer,
             ],
-            'invocation' => $service->handle($server, !$user->can(Permission::ACTION_STARTUP_READ, $server)),
+            'invocation' => $service->handle($server, hideAllValues: !$user->can(Permission::ACTION_STARTUP_READ, $server)),
             'docker_image' => $server->image,
             'egg_features' => $server->egg->inherit_features,
             'feature_limits' => [

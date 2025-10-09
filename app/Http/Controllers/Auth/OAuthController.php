@@ -56,9 +56,9 @@ class OAuthController extends Controller
         $oauthUser = Socialite::driver($driver->getId())->user();
 
         if ($request->user()) {
-            $this->linkUser($request->user(), $driver, $oauthUser);
+            $this->oauthService->linkUser($request->user(), $driver, $oauthUser);
 
-            return redirect(EditProfile::getUrl(['tab' => '-oauth-tab'], panel: 'app'));
+            return redirect(EditProfile::getUrl(['tab' => 'oauth::data::tab'], panel: 'app'));
         }
 
         $user = User::whereJsonContains('oauth->'. $driver->getId(), $oauthUser->getId())->first();
@@ -67,16 +67,6 @@ class OAuthController extends Controller
         }
 
         return $this->handleMissingUser($driver, $oauthUser);
-    }
-
-    private function linkUser(User $user, OAuthSchemaInterface $driver, OAuthUser $oauthUser): User
-    {
-        $oauth = $user->oauth;
-        $oauth[$driver->getId()] = $oauthUser->getId();
-
-        $user->update(['oauth' => $oauth]);
-
-        return $user->refresh();
     }
 
     private function handleMissingUser(OAuthSchemaInterface $driver, OAuthUser $oauthUser): RedirectResponse
@@ -93,7 +83,7 @@ class OAuthController extends Controller
                 return $this->errorRedirect();
             }
 
-            $user = $this->linkUser($user, $driver, $oauthUser);
+            $user = $this->oauthService->linkUser($user, $driver, $oauthUser);
         } else {
             if (!$driver->shouldCreateMissingUsers()) {
                 return $this->errorRedirect();

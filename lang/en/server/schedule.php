@@ -11,9 +11,11 @@ return [
     'name' => 'Name',
     'cron' => 'Cron',
     'status' => 'Status',
-    'inactive' => 'Inactive',
-    'processing' => 'Processing',
-    'active' => 'Active',
+    'schedule_status' => [
+        'inactive' => 'Inactive',
+        'processing' => 'Processing',
+        'active' => 'Active',
+    ],
     'no_tasks' => 'No Tasks',
     'run_now' => 'Run Now',
     'online_only' => 'Only When Online',
@@ -75,7 +77,8 @@ return [
         'action' => 'Action',
         'payload' => 'Payload',
         'time_offset' => 'Time Offset',
-        'seconds' => 'Seconds',
+        'first_task' => 'First Task',
+        'seconds' => 'Second|Seconds',
         'continue_on_failure' => 'Continue On Failure',
 
         'actions' => [

@@ -26,7 +26,9 @@ return [
     'already_primary' => 'Already Primary',
     'make_primary' => 'Make Primary',
     'startup_cmd' => 'Startup Command',
+    'startup_name' => 'Startup Name',
     'default_startup' => 'Default Startup Command',
+    'startup_placeholder' => 'Enter a custom startup command',
     'variables' => 'Variables',
     'resource_limits' => 'Resource Limits',
     'cpu' => 'CPU',
@@ -140,4 +142,5 @@ return [
     ],
     'notes' => 'Notes',
     'no_notes' => 'No Notes',
+    'none' => 'None',
 ];

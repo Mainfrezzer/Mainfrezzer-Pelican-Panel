@@ -1,7 +1,7 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\Application;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -101,6 +101,7 @@ Route::prefix('/servers')->group(function () {
 Route::prefix('/eggs')->group(function () {
     Route::get('/', [Application\Eggs\EggController::class, 'index'])->name('api.application.eggs.eggs');
     Route::get('/{egg:id}', [Application\Eggs\EggController::class, 'view'])->name('api.application.eggs.eggs.view');
+    Route::get('/{egg:id}/export', [Application\Eggs\EggController::class, 'export'])->name('api.application.eggs.eggs.export');
 });
 
 /*
