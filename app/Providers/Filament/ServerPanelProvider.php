@@ -19,7 +19,7 @@ class ServerPanelProvider extends PanelProvider
             ->id('server')
             ->path('server')
             ->homeUrl(fn () => Filament::getPanel('app')->getUrl())
-            ->tenant(Server::class, 'uuid_short')
+            ->tenant(Server::class)
             ->userMenuItems([
                 Action::make('to_serverList')
                     ->label(trans('profile.server_list'))
