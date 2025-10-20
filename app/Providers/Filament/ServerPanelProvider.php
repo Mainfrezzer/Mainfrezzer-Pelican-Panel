@@ -19,7 +19,7 @@ class ServerPanelProvider extends PanelProvider
             ->id('server')
             ->path('server')
             ->homeUrl(fn () => Filament::getPanel('app')->getUrl())
-            ->tenant(Server::class)
+            ->tenant(Server::class, 'uuid_short')
             ->userMenuItems([
                 Action::make('to_serverList')
                     ->label(trans('profile.server_list'))
@@ -41,7 +41,7 @@ class ServerPanelProvider extends PanelProvider
             ->discoverResources(in: app_path('Filament/Server/Resources'), for: 'App\\Filament\\Server\\Resources')
             ->discoverPages(in: app_path('Filament/Server/Pages'), for: 'App\\Filament\\Server\\Pages')
             ->discoverWidgets(in: app_path('Filament/Server/Widgets'), for: 'App\\Filament\\Server\\Widgets')
-            ->middleware([
+            ->tenantMiddleware([
                 ServerSubject::class,
             ]);
     }
