@@ -9,10 +9,10 @@ else
 
   ## manually generate a key because key generate --force fails
   if [ -z $APP_KEY ]; then
-     echo -e "Generating key."
-     APP_KEY=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-     echo -e "Generated app key: $APP_KEY"
-     echo -e "APP_KEY=$APP_KEY" > /pelican-data/.env
+    echo -e "Generating key."
+    APP_KEY=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    echo -e "Generated app key: $APP_KEY"
+    echo -e "APP_KEY=$APP_KEY" > /pelican-data/.env
   else
     echo -e "APP_KEY exists in environment, using that."
     echo -e "APP_KEY=$APP_KEY" > /pelican-data/.env
@@ -21,8 +21,6 @@ else
   ## enable installer
   echo -e "APP_INSTALLED=false" >> /pelican-data/.env
 fi
-
-sed -i "s/upload_max_filesize = 2M/upload_max_filesize = ${UPLOAD_LIMIT}M/" /usr/local/etc/php/php.ini-production
 
 mkdir -p /pelican-data/database /pelican-data/storage/avatars /pelican-data/storage/fonts /var/www/html/storage/logs/supervisord 2>/dev/null
 
@@ -42,6 +40,8 @@ php artisan filament:optimize
 
 # default to caddy not starting
 export SUPERVISORD_CADDY=false
+export PARSED_LE_EMAIL="email ${LE_EMAIL}"
+export PARSED_APP_URL=${APP_URL}
 
 ## disable caddy if SKIP_CADDY is set
 echo "Starting PHP-FPM with NGINX"
