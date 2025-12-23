@@ -66,7 +66,10 @@ WORKDIR /var/www/html
 
 # Install additional required libraries
 RUN apk add --no-cache \
-    nginx ca-certificates supervisor supercronic fcgi mysql-client php84-pgsql
+    nginx ca-certificates supervisor supercronic fcgi mysql-client yarn composer git \
+    php84-pgsql php84-intl php84-pdo php84-simplexml php84-pdo_sqlite php84-session \
+    php84-sodium php84-fileinfo php84-dom php84-tokenizer php84-bcmath php84-sqlite3 \ 
+    php84-bz2 php84-xml php84-xmlreader php84-xmlwriter
 RUN sed -i 's/www-data:x:82:82:/www-data:x:99:100:/' /etc/passwd \
 && sed -i 's/www-data:x:82:/www-data:x:100:/' /etc/group
 
