@@ -8,7 +8,7 @@
 # ================================
 # Stage 1-1: Composer Install
 # ================================
-FROM --platform=$TARGETOS/$TARGETARCH localhost:5000/base-php:$TARGETARCH AS composer
+FROM --platform=$TARGETOS/$TARGETARCH magnon.ovh/mainfrezzer/base-php:$TARGETARCH AS composer
 
 WORKDIR /build
 
@@ -38,7 +38,7 @@ RUN yarn config set network-timeout 300000 \
 FROM --platform=$TARGETOS/$TARGETARCH composer AS composerbuild
 
 # Copy full code to optimize autoload
-COPY --exclude=Caddyfile --exclude=docker/ . ./
+COPY --exclude=docker/ . ./
 
 RUN composer dump-autoload --optimize
 
@@ -50,7 +50,7 @@ FROM --platform=$TARGETOS/$TARGETARCH yarn AS yarnbuild
 WORKDIR /build
 
 # Copy full code
-COPY --exclude=Caddyfile --exclude=docker/ . ./
+COPY --exclude=docker/ . ./
 COPY --from=composer /build .
 
 RUN yarn run build
@@ -58,41 +58,37 @@ RUN yarn run build
 # ================================
 # Stage 5: Build Final Application Image
 # ================================
-FROM --platform=$TARGETOS/$TARGETARCH localhost:5000/base-php:$TARGETARCH AS final
+FROM --platform=$TARGETOS/$TARGETARCH magnon.ovh/mainfrezzer/base-php:$TARGETARCH AS final
 
 ENV NGINX_UPLOAD=138m
 ENV NGINX_TIMEOUT=120s
 WORKDIR /var/www/html
 
-# Install additional required libraries
 RUN apk add --no-cache \
-    nginx ca-certificates supervisor supercronic fcgi mysql-client php84-pgsql
+    # packages for running the panel
+    nginx ca-certificates supervisor supercronic fcgi mysql-client php84-pgsql \
+    # required for installing plugins. Pulled from https://github.com/pelican-dev/panel/pull/2034
+    zip unzip 7zip bzip2-dev yarn git
+    
 RUN sed -i 's/www-data:x:82:82:/www-data:x:99:100:/' /etc/passwd \
 && sed -i 's/www-data:x:82:/www-data:x:100:/' /etc/group
 
-COPY --chown=root:www-data --chmod=640 --from=composerbuild /build .
-COPY --chown=root:www-data --chmod=640 --from=yarnbuild /build/public ./public
+COPY --chown=root:www-data --chmod=770 --from=composerbuild /build .
+COPY --chown=root:www-data --chmod=770 --from=yarnbuild /build/public ./public
 
-# Set permissions
-# First ensure all files are owned by root and restrict www-data to read access
-RUN chown root:www-data ./ \
-    && chmod 750 ./ \
-    # Files should not have execute set, but directories need it
-    && find ./ -type d -exec chmod 750 {} \; \
-    # Create necessary directories
-    && mkdir -p /pelican-data/storage /pelican-data/plugins /var/www/html/storage/app/public /var/run/supervisord /etc/supercronic \
-    # Symlinks for env, database, storage, and plugins
-    && ln -s /pelican-data/.env ./.env \
-    && ln -s /pelican-data/database/database.sqlite ./database/database.sqlite \
-    && ln -sf /var/www/html/storage/app/public /var/www/html/public/storage \
-    && ln -s  /pelican-data/storage/avatars /var/www/html/storage/app/public/avatars \
-    && ln -s  /pelican-data/storage/fonts /var/www/html/storage/app/public/fonts \
-    && rm -r /var/www/html/plugins \
-    && ln -s  /pelican-data/plugins /var/www/html/plugins \
-    # Allow www-data write permissions where necessary
-    && chown -R www-data:www-data /pelican-data ./storage ./bootstrap/cache /var/run/supervisord /var/www/html/public/storage \
-    && chmod -R u+rwX,g+rwX,o-rwx /pelican-data ./storage ./bootstrap/cache /var/run/supervisord \
-    && chown -R www-data: /usr/local/etc/php/
+# Create and remove directories
+RUN mkdir -p /pelican-data/storage /pelican-data/plugins /var/run/supervisord \
+    && rm -rf /var/www/html/plugins \
+# Symlinks for env, database, storage, and plugins
+    && ln -s  /pelican-data/.env /var/www/html/.env \
+    && ln -s  /pelican-data/database/database.sqlite ./database/database.sqlite \
+    && ln -s  /pelican-data/storage /var/www/html/public/storage \
+    && ln -s  /pelican-data/storage /var/www/html/storage/app/public \
+    && ln -s  /pelican-data/plugins /var/www/html \
+# Allow www-data write permissions where necessary
+    && chown -R www-data: /pelican-data .env ./storage ./plugins ./bootstrap/cache /var/run/supervisord /var/www/html/public/storage \
+    && chmod -R 770 /pelican-data ./storage ./bootstrap/cache /var/run/supervisord \
+    && chown -R www-data: /usr/local/etc/php/ /usr/local/etc/php-fpm.d/
 RUN sed -i "/^user nginx;/d" /etc/nginx/nginx.conf
 RUN mkdir -p /run/nginx && chown -R www-data:www-data /run/nginx
 RUN chown -R www-data:www-data /var/log/nginx \
@@ -102,7 +98,7 @@ RUN chown -R www-data:www-data /var/log/nginx \
 COPY docker/supervisord.conf /etc/supervisord.conf
 COPY docker/Caddyfile /etc/caddy/Caddyfile
 # Add Laravel scheduler to crontab
-COPY docker/crontab /etc/supercronic/crontab
+COPY docker/crontab /etc/crontabs/crontab
 
 COPY docker/entrypoint.sh /entrypoint.sh
 COPY docker/magnon.conf /etc/nginx/http.d/default.conf
