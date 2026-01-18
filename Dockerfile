@@ -8,7 +8,7 @@
 # ================================
 # Stage 1-1: Composer Install
 # ================================
-FROM --platform=$TARGETOS/$TARGETARCH magnon.ovh/mainfrezzer/base-php:$TARGETARCH AS composer
+FROM --platform=$TARGETOS/$TARGETARCH localhost:5000/base-php:$TARGETARCH AS composer
 
 WORKDIR /build
 
@@ -58,7 +58,7 @@ RUN yarn run build
 # ================================
 # Stage 5: Build Final Application Image
 # ================================
-FROM --platform=$TARGETOS/$TARGETARCH magnon.ovh/mainfrezzer/base-php:$TARGETARCH AS final
+FROM --platform=$TARGETOS/$TARGETARCH localhost:5000/base-php:$TARGETARCH AS final
 
 ENV NGINX_UPLOAD=138m
 ENV NGINX_TIMEOUT=120s
