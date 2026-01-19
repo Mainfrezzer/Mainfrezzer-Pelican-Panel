@@ -66,13 +66,13 @@ WORKDIR /var/www/html
 
 RUN apk add --no-cache \
     # packages for running the panel
-    nginx ca-certificates supervisor supercronic fcgi mysql-client php84-pgsql \
+    nginx ca-certificates supervisor supercronic fcgi mysql-client php84-pgsql npm \
     # required for installing plugins. Pulled from https://github.com/pelican-dev/panel/pull/2034
     zip unzip 7zip bzip2-dev yarn git
-    
+RUN npm i -g yarn
 RUN sed -i 's/www-data:x:82:82:/www-data:x:99:100:/' /etc/passwd \
 && sed -i 's/www-data:x:82:/www-data:x:100:/' /etc/group
-
+COPY --from=composer /usr/local/bin/composer /usr/local/bin/composer
 COPY --chown=root:www-data --chmod=770 --from=composerbuild /build .
 COPY --chown=root:www-data --chmod=770 --from=yarnbuild /build/public ./public
 
@@ -86,11 +86,11 @@ RUN mkdir -p /pelican-data/storage /pelican-data/plugins /var/run/supervisord \
     && ln -s  /pelican-data/storage /var/www/html/storage/app/public \
     && ln -s  /pelican-data/plugins /var/www/html \
 # Allow www-data write permissions where necessary
-    && chown -R www-data: /pelican-data .env ./storage ./plugins ./bootstrap/cache /var/run/supervisord /var/www/html/public/storage \
+    && chown -R www-data: /pelican-data /home/www-data/ .env ./storage ./plugins ./bootstrap/cache /var/run/supervisord /var/www/html/public/storage \
     && chmod -R 770 /pelican-data ./storage ./bootstrap/cache /var/run/supervisord \
     && chown -R www-data: /usr/local/etc/php/ /usr/local/etc/php-fpm.d/
 RUN sed -i "/^user nginx;/d" /etc/nginx/nginx.conf
-RUN mkdir -p /run/nginx && chown -R www-data:www-data /run/nginx
+RUN mkdir -p /run/nginx && chown -R www-data:www-data /run/nginx 
 RUN chown -R www-data:www-data /var/log/nginx \
     && chown -R www-data:www-data /var/lib/nginx
 
