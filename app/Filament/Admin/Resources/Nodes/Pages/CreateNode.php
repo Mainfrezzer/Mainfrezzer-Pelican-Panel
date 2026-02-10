@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Resources\Nodes\Pages;
 
+use App\Enums\TablerIcon;
 use App\Filament\Admin\Resources\Nodes\NodeResource;
 use App\Models\Node;
 use App\Traits\Filament\CanCustomizeHeaderActions;
@@ -39,13 +40,14 @@ class CreateNode extends CreateRecord
             ->components([
                 Wizard::make($this->getSteps())
                     ->columnSpanFull()
-                    ->nextAction(fn (Action $action) => $action->iconButton()->iconSize(IconSize::ExtraLarge)->icon('tabler-arrow-right'))
-                    ->previousAction(fn (Action $action) => $action->iconButton()->iconSize(IconSize::ExtraLarge)->icon('tabler-arrow-left'))
+                    ->nextAction(fn (Action $action) => $action->tooltip(fn () => $action->getLabel())->iconButton()->iconSize(IconSize::ExtraLarge)->icon(TablerIcon::ArrowRight))
+                    ->previousAction(fn (Action $action) => $action->tooltip(fn () => $action->getLabel())->iconButton()->iconSize(IconSize::ExtraLarge)->icon(TablerIcon::ArrowLeft))
                     ->submitAction(new HtmlString(Blade::render(<<<'BLADE'
                         <x-filament::icon-button
                             type="submit"
                             iconSize="xl"
-                            icon="tabler-file-plus"
+                            icon="tabler-plus"
+                            tooltip="{{ trans('admin/node.create') }}"
                         >
                             {{ trans('admin/node.create') }}
                         </x-filament::icon-button>
@@ -59,7 +61,7 @@ class CreateNode extends CreateRecord
         return [
             Step::make('basic')
                 ->label(trans('admin/node.tabs.basic_settings'))
-                ->icon('tabler-server')
+                ->icon(TablerIcon::Server)
                 ->columnSpanFull()
                 ->columns([
                     'default' => 2,
@@ -203,9 +205,9 @@ class CreateNode extends CreateRecord
                             'https_proxy' => 'success',
                         ])
                         ->icons([
-                            'http' => 'tabler-lock-open-off',
-                            'https' => 'tabler-lock',
-                            'https_proxy' => 'tabler-shield-lock',
+                            'http' => TablerIcon::LockOpenOff,
+                            'https' => TablerIcon::Lock,
+                            'https_proxy' => TablerIcon::ShieldLock,
                         ])
                         ->default(fn () => request()->isSecure() ? 'https' : 'http')
                         ->live()
@@ -231,7 +233,7 @@ class CreateNode extends CreateRecord
                 ]),
             Step::make('advanced')
                 ->label(trans('admin/node.tabs.advanced_settings'))
-                ->icon('tabler-server-cog')
+                ->icon(TablerIcon::ServerCog)
                 ->columnSpanFull()
                 ->columns([
                     'default' => 2,
@@ -244,7 +246,7 @@ class CreateNode extends CreateRecord
                         ->label(trans('admin/node.maintenance_mode'))->inline()
                         ->columnSpan(1)
                         ->default(false)
-                        ->hintIcon('tabler-question-mark', trans('admin/node.maintenance_mode_help'))
+                        ->hintIcon(TablerIcon::QuestionMark, trans('admin/node.maintenance_mode_help'))
                         ->options([
                             true => trans('admin/node.enabled'),
                             false => trans('admin/node.disabled'),
@@ -270,12 +272,20 @@ class CreateNode extends CreateRecord
                         ->columnSpan(2),
                     TextInput::make('upload_size')
                         ->label(trans('admin/node.upload_limit'))
-                        ->hintIcon('tabler-question-mark', trans('admin/node.upload_limit_help'))
+                        ->hintIcon(TablerIcon::QuestionMark, trans('admin/node.upload_limit_help'))
                         ->columnSpan(1)
                         ->numeric()->required()
                         ->default(256)
                         ->minValue(1)
                         ->suffix(config('panel.use_binary_prefix') ? 'MiB' : 'MB'),
+                    TextInput::make('daemon_base')
+                        ->label(trans('admin/node.daemon_base'))
+                        ->placeholder('/var/lib/pelican/volumes')
+                        ->hintIcon(TablerIcon::QuestionMark, trans('admin/node.daemon_base_help'))
+                        ->columnSpan(1)
+                        ->required()
+                        ->default('/var/lib/pelican/volumes')
+                        ->rule('regex:/^([\/][\d\w.\-\/]+)$/'),
                     TextInput::make('daemon_sftp')
                         ->columnSpan(1)
                         ->label(trans('admin/node.sftp_port'))
@@ -285,7 +295,7 @@ class CreateNode extends CreateRecord
                         ->required()
                         ->integer(),
                     TextInput::make('daemon_sftp_alias')
-                        ->columnSpan(2)
+                        ->columnSpan(1)
                         ->label(trans('admin/node.sftp_alias'))
                         ->helperText(trans('admin/node.sftp_alias_help')),
                     Grid::make()
