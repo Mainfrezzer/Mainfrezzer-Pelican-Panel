@@ -69,9 +69,10 @@ RUN apk add --no-cache \
 RUN sed -i 's/www-data:x:82:82:/www-data:x:99:100:/' /etc/passwd \
 && sed -i 's/www-data:x:82:/www-data:x:100:/' /etc/group
 
+# Copy composer binary for runtime plugin dependency management
+COPY --from=composer /usr/local/bin/composer /usr/local/bin/composer
 COPY --chown=root:www-data --chmod=770 --from=composerbuild /build .
 COPY --chown=root:www-data --chmod=770 --from=yarnbuild /build/public ./public
-COPY --from=composer /usr/local/bin/composer /usr/local/bin/composer
 
 # Create and remove directories
 RUN mkdir -p /pelican-data/storage /pelican-data/plugins /var/run/supervisord \
@@ -85,12 +86,11 @@ RUN mkdir -p /pelican-data/storage /pelican-data/plugins /var/run/supervisord \
 # Allow www-data write permissions where necessary
     && chown -R www-data: /pelican-data /home/www-data/ .env ./storage ./plugins ./bootstrap/cache /var/run/supervisord /var/www/html/public/storage \
     && chmod -R 770 /pelican-data ./storage ./bootstrap/cache /var/run/supervisord \
-    && chown -R www-data: /usr/local/etc/php/ /usr/local/etc/php-fpm.d/
+    && chown -R www-data: /usr/local/etc/php/ /usr/local/etc/php-fpm.d/ /var/www/html/composer.json /var/www/html/composer.lock
 RUN sed -i "/^user nginx;/d" /etc/nginx/nginx.conf
 RUN mkdir -p /run/nginx && chown -R www-data:www-data /run/nginx
 RUN chown -R www-data:www-data /var/log/nginx \
     && chown -R www-data:www-data /var/lib/nginx
-
 # Configure Supervisor
 COPY docker/supervisord.conf /etc/supervisord.conf
 COPY docker/Caddyfile /etc/caddy/Caddyfile
