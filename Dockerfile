@@ -22,7 +22,7 @@ RUN composer install --no-dev --no-interaction --no-autoloader --no-scripts
 # ================================
 # Stage 1-2: Yarn Install
 # ================================
-FROM --platform=$TARGETOS/$TARGETARCH node:20-alpine AS yarn
+FROM --platform=$TARGETOS/$TARGETARCH node:22-alpine AS yarn
 
 WORKDIR /build
 
@@ -65,7 +65,8 @@ ENV NGINX_TIMEOUT=120s
 WORKDIR /var/www/html
 
 RUN apk add --no-cache \
-    nginx ca-certificates supervisor supercronic fcgi mysql-client php84-pgsql zip unzip 7zip bzip2-dev yarn git
+    # packages for running the panel
+    nginx ca-certificates supervisor supercronic fcgi mysql-client php85-pgsql zip unzip 7zip bzip2-dev yarn git
 RUN sed -i 's/www-data:x:82:82:/www-data:x:99:100:/' /etc/passwd \
 && sed -i 's/www-data:x:82:/www-data:x:100:/' /etc/group
 
@@ -75,16 +76,14 @@ COPY --chown=root:www-data --chmod=770 --from=composerbuild /build .
 COPY --chown=root:www-data --chmod=770 --from=yarnbuild /build/public ./public
 
 # Create and remove directories
-RUN mkdir -p /pelican-data/storage /pelican-data/plugins /var/run/supervisord \
-    && rm -rf /var/www/html/plugins \
-# Symlinks for env, database, storage, and plugins
+RUN mkdir -p /pelican-data/storage /var/run/supervisord \
+# Symlinks for env, database, storage
     && ln -s  /pelican-data/.env /var/www/html/.env \
     && ln -s  /pelican-data/database/database.sqlite ./database/database.sqlite \
     && ln -s  /pelican-data/storage /var/www/html/public/storage \
     && ln -s  /pelican-data/storage /var/www/html/storage/app/public \
-    && ln -s  /pelican-data/plugins /var/www/html \
 # Allow www-data write permissions where necessary
-    && chown -R www-data: /pelican-data /home/www-data/ .env ./storage ./plugins ./bootstrap/cache /var/run/supervisord /var/www/html/public/storage \
+    && chown -R www-data: /pelican-data .env ./storage ./bootstrap/cache /var/run/supervisord /var/www/html/public/storage \
     && chmod -R 770 /pelican-data ./storage ./bootstrap/cache /var/run/supervisord \
     && chown -R www-data: /usr/local/etc/php/ /usr/local/etc/php-fpm.d/ /var/www/html/composer.json /var/www/html/composer.lock
 RUN sed -i "/^user nginx;/d" /etc/nginx/nginx.conf
