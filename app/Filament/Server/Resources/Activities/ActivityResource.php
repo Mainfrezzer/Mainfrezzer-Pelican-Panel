@@ -133,7 +133,12 @@ class ActivityResource extends Resource
             ])
             ->filters([
                 SelectFilter::make('event')
-                    ->options(fn (Table $table) => $table->getQuery()->pluck('event', 'event')->unique()->sort())
+                    ->options(fn (Table $table) => $table->getQuery()->select('event')->distinct()->orderBy('event')->pluck('event', 'event'))
+                    ->searchable()
+                    ->preload(),
+                SelectFilter::make('actor_id')
+                    ->label(trans('server/activity.user'))
+                    ->options(fn (Table $table) => $table->getQuery()->with('actor')->get()->pluck('actor.username', 'actor.id')->filter())
                     ->searchable()
                     ->preload(),
             ]);

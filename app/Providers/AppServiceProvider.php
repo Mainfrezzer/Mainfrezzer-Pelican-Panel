@@ -38,6 +38,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Laravel\Passkeys\Passkeys;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Health\Facades\Health;
 
@@ -87,6 +88,8 @@ class AppServiceProvider extends ServiceProvider
                 ->baseUrl($node->getConnectionAddress())
         );
 
+        Passkeys::useUserModel(User::class);
+
         Sanctum::usePersonalAccessTokenModel(ApiKey::class);
 
         Gate::define('viewApiDocs', fn () => true);
@@ -116,8 +119,6 @@ class AppServiceProvider extends ServiceProvider
             'Latest Version' => $versionService->latestPanelVersion(),
             'Up-to-Date' => $versionService->isLatestPanel() ? '<fg=green;options=bold>Yes</>' : '<fg=red;options=bold>No</>',
         ]);
-
-        AboutCommand::add('Drivers', 'Backups', config('backups.default'));
 
         AboutCommand::add('Environment', 'Installation Directory', base_path());
     }

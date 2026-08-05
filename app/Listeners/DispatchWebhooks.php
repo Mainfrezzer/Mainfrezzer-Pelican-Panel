@@ -100,6 +100,10 @@ class DispatchWebhooks
     {
         $eventName = $activityLogged->model->event;
 
+        if ($eventName === null) {
+            return;
+        }
+
         if (!$activityLogged->isServerEvent()) {
             return;
         }
@@ -175,17 +179,33 @@ class DispatchWebhooks
     protected function handleGlobalWebhooks(ActivityLogged $activityLogged): void
     {
         $eventName = $activityLogged->model->event;
+        $activityLoggedClass = ActivityLogged::class;
 
-        if (!$this->eventIsWatched($eventName)) {
+        if ($eventName === null) {
             return;
         }
 
-        $matchingHooks = cache()->rememberForever("webhooks.$eventName", function () use ($eventName) {
-            return WebhookConfiguration::query()
+        $matchingHooks = collect();
+
+        if ($this->eventIsWatched($eventName)) {
+            $matchingHooks = $matchingHooks->merge(
+                cache()->rememberForever("webhooks.$eventName", fn () => WebhookConfiguration::query()
+                    ->where('scope', WebhookScope::Global)
+                    ->whereJsonContains('events', $eventName)
+                    ->get())
+            );
+        }
+
+        $matchingHooks = $matchingHooks->merge(
+            cache()->rememberForever("webhooks.$activityLoggedClass", fn () => WebhookConfiguration::query()
                 ->where('scope', WebhookScope::Global)
-                ->whereJsonContains('events', $eventName)
-                ->get();
-        });
+                ->whereJsonContains('events', $activityLoggedClass)
+                ->get())
+        )->unique('id');
+
+        if ($matchingHooks->isEmpty()) {
+            return;
+        }
 
         $webhookData = $this->buildActivityPayload($activityLogged);
 
@@ -198,8 +218,12 @@ class DispatchWebhooks
         }
     }
 
-    protected function eventIsWatched(string $eventName): bool
+    protected function eventIsWatched(?string $eventName): bool
     {
+        if ($eventName === null) {
+            return false;
+        }
+
         $watchedEvents = cache()->rememberForever('watchedWebhooks', function () {
             return WebhookConfiguration::where('scope', WebhookScope::Global)
                 ->pluck('events')

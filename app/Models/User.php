@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Contracts\Validatable;
 use App\Enums\CustomizationKey;
+use App\Enums\ServerUserSettingKey;
 use App\Enums\SubuserPermission;
 use App\Events\User\Deleting;
 use App\Exceptions\DisplayException;
@@ -42,6 +43,8 @@ use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\In;
+use Laravel\Passkeys\Contracts\PasskeyUser;
+use Laravel\Passkeys\PasskeyAuthenticatable;
 use ResourceBundle;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Traits\HasRoles;
@@ -84,6 +87,8 @@ use Spatie\Permission\Traits\HasRoles;
  * @property-read int|null $sub_servers_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Subuser> $subusers
  * @property-read int|null $subusers_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, ServerUserSettings> $serverSettings
+ * @property-read int|null $server_settings_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, ApiKey> $tokens
  * @property-read int|null $tokens_count
  *
@@ -113,7 +118,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @method static Builder<static>|User withoutPermission($permissions)
  * @method static Builder<static>|User withoutRole($roles, $guard = null)
  */
-class User extends Model implements AuthenticatableContract, AuthorizableContract, CanResetPasswordContract, FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery, HasAvatar, HasEmailAuthentication, HasName, HasTenants, Validatable
+class User extends Model implements AuthenticatableContract, AuthorizableContract, CanResetPasswordContract, FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery, HasAvatar, HasEmailAuthentication, HasName, HasTenants, PasskeyUser, Validatable
 {
     use Authenticatable;
     use Authorizable { can as protected canned; }
@@ -123,6 +128,7 @@ class User extends Model implements AuthenticatableContract, AuthorizableContrac
     use HasRoles;
     use HasValidation { getRules as getValidationRules; }
     use Notifiable;
+    use PasskeyAuthenticatable;
 
     public const USER_LEVEL_USER = 0;
 
@@ -348,6 +354,30 @@ class User extends Model implements AuthenticatableContract, AuthorizableContrac
         return $this->belongsToMany(Server::class, 'subusers');
     }
 
+    /** @return HasMany<ServerUserSettings, $this> */
+    public function serverSettings(): HasMany
+    {
+        return $this->hasMany(ServerUserSettings::class);
+    }
+
+    public function getServerSetting(Server $server, ServerUserSettingKey $key): string|int|bool
+    {
+        $settings = $this->serverSettings()->where('server_id', $server->id)->first()->settings ?? [];
+
+        return $settings[$key->value] ?? $key->getDefaultValue();
+    }
+
+    public function updateServerSetting(Server $server, ServerUserSettingKey $key, string|int|bool $value): void
+    {
+        $row = $this->serverSettings()->firstOrNew(['server_id' => $server->id]);
+
+        $settings = $row->settings ?? [];
+        $settings[$key->value] = $value;
+
+        $row->settings = array_intersect_key($settings, ServerUserSettingKey::getDefaultSettings());
+        $row->save();
+    }
+
     /** @return ($key is null ? array<string, string|int|bool> : string|int|bool) */
     public function getCustomization(?CustomizationKey $key = null): array|string|int|bool|null
     {
@@ -525,5 +555,15 @@ class User extends Model implements AuthenticatableContract, AuthorizableContrac
     public function toggleEmailAuthentication(bool $condition): void
     {
         $this->update(['mfa_email_enabled' => $condition]);
+    }
+
+    public function getPasskeyDisplayName(): string
+    {
+        return $this->username ?? $this->email;
+    }
+
+    public function getPasskeyUsername(): string
+    {
+        return $this->email;
     }
 }

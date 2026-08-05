@@ -20,7 +20,8 @@ use Illuminate\Database\Query\Builder;
  * @property string $uuid
  * @property string $name
  * @property string[] $ignored_files
- * @property string $disk
+ * @property int $backup_host_id
+ * @property BackupHost $backupHost
  * @property string|null $checksum
  * @property int $bytes
  * @property CarbonImmutable|null $completed_at
@@ -30,6 +31,7 @@ use Illuminate\Database\Query\Builder;
  * @property bool $is_successful
  * @property string|null $upload_id
  * @property bool $is_locked
+ * @property bool $is_scheduled
  * @property-read Server $server
  * @property-read BackupStatus $status
  *
@@ -65,13 +67,10 @@ class Backup extends Model implements Validatable
 
     public const RESOURCE_NAME = 'backup';
 
-    public const ADAPTER_DAEMON = 'wings';
-
-    public const ADAPTER_AWS_S3 = 's3';
-
     protected $attributes = [
         'is_successful' => false,
         'is_locked' => false,
+        'is_scheduled' => false,
         'checksum' => null,
         'bytes' => 0,
         'upload_id' => null,
@@ -85,9 +84,10 @@ class Backup extends Model implements Validatable
         'uuid' => ['required', 'uuid'],
         'is_successful' => ['boolean'],
         'is_locked' => ['boolean'],
+        'is_scheduled' => ['boolean'],
         'name' => ['required', 'string'],
         'ignored_files' => ['array'],
-        'disk' => ['required', 'string'],
+        'backup_host_id' => ['required', 'integer', 'exists:backup_hosts,id'],
         'checksum' => ['nullable', 'string'],
         'bytes' => ['numeric'],
         'upload_id' => ['nullable', 'string'],
@@ -99,6 +99,7 @@ class Backup extends Model implements Validatable
             'id' => 'int',
             'is_successful' => 'bool',
             'is_locked' => 'bool',
+            'is_scheduled' => 'bool',
             'ignored_files' => 'array',
             'bytes' => 'int',
             'completed_at' => 'immutable_datetime',
@@ -118,6 +119,11 @@ class Backup extends Model implements Validatable
     public function server(): BelongsTo
     {
         return $this->belongsTo(Server::class);
+    }
+
+    public function backupHost(): BelongsTo
+    {
+        return $this->belongsTo(BackupHost::class);
     }
 
     /**
