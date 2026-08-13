@@ -90,6 +90,9 @@ RUN sed -i "/^user nginx;/d" /etc/nginx/nginx.conf
 RUN mkdir -p /run/nginx && chown -R www-data:www-data /run/nginx
 RUN chown -R www-data:www-data /var/log/nginx \
     && chown -R www-data:www-data /var/lib/nginx
+# Configure PHP and PHP-FPM
+COPY docker/php/pelican.ini /usr/local/etc/php/conf.d/zz-pelican.ini
+COPY docker/php/pelican-pool.conf /usr/local/etc/php-fpm.d/zz-pelican.conf
 # Configure Supervisor
 COPY docker/supervisord.conf /etc/supervisord.conf
 COPY docker/Caddyfile /etc/caddy/Caddyfile
@@ -101,7 +104,7 @@ COPY docker/magnon.conf /etc/nginx/http.d/default.conf
 RUN chown -R www-data:www-data /etc/nginx/http.d/
 COPY docker/healthcheck.sh /healthcheck.sh
 
-HEALTHCHECK --interval=5m --timeout=10s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=2m --retries=3 \
   CMD /bin/ash /healthcheck.sh
 
 EXPOSE 80 443
