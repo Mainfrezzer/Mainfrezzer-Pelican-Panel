@@ -7,6 +7,7 @@ return [
 
     'name' => 'Name',
     'update_available' => 'An update for this plugin is available',
+    'api_version_missing' => '⚠ plugin.json does not declare an api_version, assuming 1',
     'author' => 'Author',
     'version' => 'Version',
     'category' => 'Category',
@@ -71,6 +72,7 @@ return [
         'import_no_manifest' => 'The zip does not contain a valid plugin.json',
         'import_invalid_id' => 'The plugin.json contains an invalid id',
         'import_id_mismatch' => 'The zip is for plugin ":actual", not ":expected"',
+        'import_checksum_mismatch' => 'The downloaded zip does not match the checksum from the update feed',
         'import_failed' => 'Could not import plugin',
     ],
 ];

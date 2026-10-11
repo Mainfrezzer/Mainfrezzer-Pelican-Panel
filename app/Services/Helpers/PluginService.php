@@ -16,7 +16,6 @@ use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\ServiceProvider;
@@ -42,9 +41,17 @@ class PluginService
         $plugins = Plugin::orderBy('load_order')->get();
         foreach ($plugins as $plugin) {
             try {
+                // Filter out plugins that require a newer plugin api than this panel supports
+                // (only in production, so plugin developers can work on fixing their plugin locally)
+                if ($this->app->isProduction() && !$plugin->isApiVersionSupported()) {
+                    $this->setStatus($plugin, PluginStatus::Incompatible, 'This Plugin requires plugin api version ' . $plugin->effectiveApiVersion() . ' but this Panel only supports up to version ' . Plugin::SUPPORTED_API_VERSION . '!');
+
+                    continue;
+                }
+
                 // Filter out plugins that are not compatible with the current panel version
                 if (!$plugin->isCompatible()) {
-                    $this->setStatus($plugin, PluginStatus::Incompatible, 'This Plugin is only compatible with Panel version ' . $plugin->panel_version . (!$plugin->isPanelVersionStrict() ? ' or newer' : '') . ' but you are using version ' . config('app.version') . '!');
+                    $this->setStatus($plugin, PluginStatus::Incompatible, 'This Plugin is only compatible with Panel version ' . $plugin->panel_version . (!$plugin->isPanelVersionStrict() ? ' or a compatible newer version' : '') . ' but you are using version ' . $this->app->make(SoftwareVersionService::class)->currentPanelVersion() . '!');
 
                     continue;
                 } else {
@@ -305,19 +312,31 @@ class PluginService
     }
 
     /** @throws Exception */
-    public function updatePlugin(Plugin $plugin): void
+    public function updatePlugin(Plugin $plugin): Plugin
     {
-        $downloadUrl = $plugin->getDownloadUrlForUpdate();
-        throw_unless($downloadUrl, new Exception('No download url found.'));
+        $download = $plugin->getUpdateDownload();
+        throw_unless($download, new Exception('No download url found.'));
 
-        $this->downloadPluginFromUrl($downloadUrl, $plugin->id);
+        $this->downloadPluginFromUrl($download['url'], $plugin->id, $download['sha256']);
 
         Plugin::refreshRows();
-        $plugin = $plugin->refresh();
+        $plugin = Plugin::findOrFail($plugin->id);
 
-        $this->installPlugin($plugin, false);
+        // A plugin that was never installed only gets its files swapped.
+        if ($plugin->status !== PluginStatus::NotInstalled) {
+            $this->installPlugin($plugin, false);
+        }
 
         cache()->forget("plugins.$plugin->id.update");
+
+        return $plugin;
+    }
+
+    public function isInstalled(string $id): bool
+    {
+        Plugin::refreshRows();
+
+        return Plugin::findOrFail($id)->status !== PluginStatus::NotInstalled;
     }
 
     /** @throws Exception */
@@ -424,6 +443,19 @@ class PluginService
         // backup all sit under plugins/, so each move is a same-filesystem rename.
         $rollback = null;
         if (File::isDirectory($target)) {
+            // The archive brings its own plugin.json, so keep the install state (status, load order)
+            // of the copy it replaces. Callers reinstall an installed plugin to apply its changes.
+            // A copy without meta was never installed, so drop whatever meta the archive claims.
+            // Written before the swap so a failed write leaves the existing plugin untouched.
+            $oldManifest = join_paths($target, 'plugin.json');
+            $meta = File::exists($oldManifest) ? (File::json($oldManifest)['meta'] ?? []) : [];
+            if ($meta === []) {
+                unset($data['meta']);
+            } else {
+                $data['meta'] = $meta;
+            }
+            throw_if(File::put($manifest, json_encode($data, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) === false, new Exception('Could not write the plugin manifest.'));
+
             $rollback = plugin_path('.' . $pluginName . '.bak');
             File::deleteDirectory($rollback);
             throw_unless(File::moveDirectory($target, $rollback), new Exception('Could not set the existing plugin aside.'));
@@ -468,13 +500,18 @@ class PluginService
     }
 
     /** @throws Exception */
-    public function downloadPluginFromUrl(string $url, ?string $expectedId = null): string
+    public function downloadPluginFromUrl(string $url, ?string $expectedId = null, ?string $expectedSha256 = null): string
     {
         $basename = pathinfo($url, PATHINFO_BASENAME);
         $tmpDir = TemporaryDirectory::make()->deleteWhenDestroyed();
         $tmpPath = $tmpDir->path($basename);
 
-        $content = Http::timeout(60)->connectTimeout(5)->throw()->get($url)->body();
+        $content = HubCredentials::request($url)->timeout(60)->connectTimeout(5)->throw()->get($url)->body();
+
+        // Any advertised checksum must match, including an empty or malformed one.
+        if ($expectedSha256 !== null) {
+            throw_unless(hash_equals(strtolower($expectedSha256), hash('sha256', $content)), new InvalidFileUploadException(trans('admin/plugin.notifications.import_checksum_mismatch')));
+        }
 
         // Validate file size to prevent zip bombs
         $maxSize = config('panel.plugin.max_import_size');

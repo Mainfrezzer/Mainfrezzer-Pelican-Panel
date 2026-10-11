@@ -75,10 +75,20 @@ return [
 
     'webhook' => [
         'prune_days' => env('APP_WEBHOOK_PRUNE_DAYS', 30),
+
+        /*
+        | Request timeout in seconds used when delivering a webhook. A webhook type can
+        | override this by implementing its own deliver() method.
+        */
+        'timeout' => env('APP_WEBHOOK_TIMEOUT', 30),
     ],
 
     'plugin' => [
         'dev_mode' => env('PANEL_PLUGIN_DEV_MODE', false),
         'max_import_size' => env('PANEL_PLUGIN_MAX_IMPORT_SIZE', 1024 * 1024 * 100),
+        // Optional Pelican Hub key for this panel. Only sent to hub_url over https,
+        // so the Hub can serve beta builds this panel was explicitly enrolled in.
+        'hub_url' => env('PANEL_PLUGIN_HUB_URL', 'https://hub.pelican.dev'),
+        'hub_api_key' => env('PANEL_PLUGIN_HUB_API_KEY'),
     ],
 ];
