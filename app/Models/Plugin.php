@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use JsonException;
 use Sushi\Sushi;
+use Throwable;
 
 /**
  * @property string $id
@@ -225,12 +226,22 @@ class Plugin extends Model implements HasPluginSettings
 
     public function shouldLoad(?string $panelId = null): bool
     {
-        return $this->fullClass() !== '\\Error\\Error' && ($this->status === PluginStatus::Enabled || $this->status === PluginStatus::Errored) && (is_null($panelId) || !$this->panels || in_array($panelId, explode(',', $this->panels)));
+        if ($this->fullClass() === '\\Error\\Error') {
+            return false;
+        }
+
+        if ($panelId) {
+            if ($this->panels && !in_array($panelId, explode(',', $this->panels)) && $this->category === PluginCategory::Plugin) {
+                return false;
+            }
+        }
+
+        return $this->status === PluginStatus::Enabled || $this->status === PluginStatus::Errored;
     }
 
     public function canEnable(): bool
     {
-        return $this->status === PluginStatus::Disabled && $this->isCompatible();
+        return ($this->status === PluginStatus::Disabled || $this->status === PluginStatus::Crashed) && $this->isCompatible();
     }
 
     public function canDisable(): bool
@@ -389,7 +400,7 @@ class Plugin extends Model implements HasPluginSettings
             $pluginObject = new ($this->fullClass());
 
             return $pluginObject instanceof HasPluginSettings;
-        } catch (Exception) {
+        } catch (Throwable) {
         }
 
         return false;
@@ -404,7 +415,7 @@ class Plugin extends Model implements HasPluginSettings
             if ($pluginObject instanceof HasPluginSettings) {
                 return $pluginObject->getSettingsFormData();
             }
-        } catch (Exception) {
+        } catch (Throwable) {
         }
 
         return [];
@@ -419,7 +430,7 @@ class Plugin extends Model implements HasPluginSettings
             if ($pluginObject instanceof HasPluginSettings) {
                 return $pluginObject->getSettingsForm();
             }
-        } catch (Exception) {
+        } catch (Throwable) {
         }
 
         return [];
@@ -434,7 +445,7 @@ class Plugin extends Model implements HasPluginSettings
             if ($pluginObject instanceof HasPluginSettings) {
                 $pluginObject->saveSettings($data);
             }
-        } catch (Exception) {
+        } catch (Throwable) {
         }
     }
 
