@@ -103,6 +103,13 @@ if (!function_exists('plugin_path')) {
     }
 }
 
+if (!function_exists('is_running_in_docker')) {
+    function is_running_in_docker(): bool
+    {
+        return @file_exists('/.dockerenv');
+    }
+}
+
 if (!function_exists('get_ip_from_hostname')) {
     function get_ip_from_hostname(string $hostname): string|bool
     {
@@ -114,6 +121,12 @@ if (!function_exists('get_ip_from_hostname')) {
         $validAAAARecords = @dns_get_record($hostname, DNS_AAAA);
         if ($validAAAARecords) {
             return collect($validAAAARecords)->first()['ipv6'];
+        }
+
+        // Fall back to the system resolver, which honors /etc/hosts (e.g. Docker extra_hosts)
+        $systemRecords = @gethostbynamel($hostname);
+        if ($systemRecords) {
+            return $systemRecords[0];
         }
 
         return false;

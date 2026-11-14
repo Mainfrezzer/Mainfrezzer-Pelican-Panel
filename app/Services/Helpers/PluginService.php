@@ -61,7 +61,10 @@ class PluginService
 
                 // Filter out plugins that are not compatible with the current panel version
                 if (!$plugin->isCompatible()) {
-                    $this->setStatus($plugin, PluginStatus::Incompatible, 'This Plugin is only compatible with Panel version ' . $plugin->panel_version . (!$plugin->isPanelVersionStrict() ? ' or a compatible newer version' : '') . ' but you are using version ' . $this->app->make(SoftwareVersionService::class)->currentPanelVersion() . '!');
+                    // This runs during service provider registration, before the cache is bound, so it can't use
+                    // SoftwareVersionService::currentPanelVersion(). Canary always passes isCompatible(), so the
+                    // configured version is the real release version here.
+                    $this->setStatus($plugin, PluginStatus::Incompatible, 'This Plugin is only compatible with Panel version ' . $plugin->panel_version . (!$plugin->isPanelVersionStrict() ? ' or a compatible newer version' : '') . ' but you are using version ' . config('app.version') . '!');
 
                     continue;
                 } else {
@@ -185,26 +188,7 @@ class PluginService
      */
     public function manageComposerPackages(?array $newPackages = [], ?array $oldPackages = null): void
     {
-        $newPackages ??= [];
-
-        $plugins = Plugin::orderBy('load_order')->get();
-        foreach ($plugins as $plugin) {
-            if (!$plugin->composer_packages) {
-                continue;
-            }
-
-            if (!$plugin->shouldLoad()) {
-                continue;
-            }
-
-            try {
-                $pluginPackages = json_decode($plugin->composer_packages, true, 512, JSON_THROW_ON_ERROR);
-
-                $newPackages = array_merge($newPackages, $pluginPackages);
-            } catch (Exception $exception) {
-                report($exception);
-            }
-        }
+        $newPackages = array_merge($newPackages ?? [], $this->pluginComposerPackages());
 
         $oldPackages = collect($oldPackages)
             ->filter(fn ($version, $package) => !array_key_exists($package, $newPackages))
@@ -227,6 +211,31 @@ class PluginService
             $result = Process::path(base_path())->timeout(600)->run(['composer', 'require', '--update-no-dev', ...$newPackages]);
             throw_if($result->failed(), new Exception('Could not require new composer packages: ' . $result->errorOutput()));
         }
+    }
+
+    /**
+     * The composer packages required by every plugin that gets loaded, as package => version constraint.
+     *
+     * @return array<string, string>
+     */
+    public function pluginComposerPackages(): array
+    {
+        $packages = [];
+
+        $plugins = Plugin::orderBy('load_order')->get();
+        foreach ($plugins as $plugin) {
+            if (!$plugin->composer_packages || !$plugin->shouldLoad()) {
+                continue;
+            }
+
+            try {
+                $packages = array_merge($packages, json_decode($plugin->composer_packages, true, 512, JSON_THROW_ON_ERROR));
+            } catch (Exception $exception) {
+                report($exception);
+            }
+        }
+
+        return $packages;
     }
 
     /** @throws Exception */
@@ -357,6 +366,7 @@ class PluginService
         $this->rollbackPluginMigrations($plugin);
 
         $this->setStatus($plugin, PluginStatus::NotInstalled);
+        $this->clearDefaultTheme($plugin);
 
         if ($deleteFiles) {
             $this->deletePlugin($plugin);
@@ -439,6 +449,8 @@ class PluginService
         // "../../evil" that would escape the plugins directory when passed to plugin_path().
         $pluginName = Str::lower(trim($id));
         throw_unless(preg_match('/^[a-z0-9][a-z0-9._-]*$/', $pluginName), new Exception(trans('admin/plugin.notifications.import_invalid_id')));
+
+        throw_if(in_array($pluginName, [ThemeService::Default, ThemeService::None], true), new Exception(trans('admin/plugin.notifications.import_reserved_id', ['id' => $pluginName])));
 
         // When updating a known plugin, the archive must be for that same plugin — reject a
         // mismatched id before moving anything, so an update can't overwrite a different plugin.
@@ -546,6 +558,17 @@ class PluginService
     public function disablePlugin(string|Plugin $plugin): void
     {
         $this->setStatus($plugin, PluginStatus::Disabled);
+        $this->clearDefaultTheme($plugin);
+    }
+
+    /** A default theme that is no longer enabled would fail the settings form and, if forced, hide the theme picker for nothing. */
+    private function clearDefaultTheme(string|Plugin $plugin): void
+    {
+        $themeService = $this->app->make(ThemeService::class);
+
+        if ($themeService->getDefaultThemeId() === (is_string($plugin) ? $plugin : $plugin->id)) {
+            $themeService->setDefaultTheme(ThemeService::None);
+        }
     }
 
     /** @param array<string, mixed> $data */
@@ -588,16 +611,14 @@ class PluginService
         }
     }
 
-    public function hasThemePluginEnabled(): bool
+    public function hasAnyThemeEnabled(): bool
     {
-        $plugins = Plugin::orderBy('load_order')->get();
-        foreach ($plugins as $plugin) {
-            if ($plugin->isTheme() && $plugin->status === PluginStatus::Enabled) {
-                return true;
-            }
-        }
+        return Plugin::themes()->exists();
+    }
 
-        return false;
+    public function hasExclusiveThemeEnabled(): bool
+    {
+        return Plugin::themes()->get()->contains(fn (Plugin $plugin) => !$plugin->isSwitchableTheme());
     }
 
     /** @return string[] */

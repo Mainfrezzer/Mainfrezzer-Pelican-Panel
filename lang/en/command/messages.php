@@ -35,6 +35,7 @@ return [
         ],
     ],
     'environment' => [
+        'env_locked' => ':key is set in the server environment, which always wins over .env, so it was not saved.',
         'mail' => [
             'ask_smtp_host' => 'SMTP Host (e.g. smtp.gmail.com)',
             'ask_smtp_port' => 'SMTP Port',
@@ -48,7 +49,7 @@ return [
             'ask_driver' => 'Which driver should be used for sending emails?',
             'ask_mail_from' => 'Email address emails should originate from',
             'ask_mail_name' => 'Name that emails should appear from',
-            'ask_encryption' => 'Encryption method to use',
+            'ask_scheme' => 'Mail scheme',
         ],
     ],
 ];

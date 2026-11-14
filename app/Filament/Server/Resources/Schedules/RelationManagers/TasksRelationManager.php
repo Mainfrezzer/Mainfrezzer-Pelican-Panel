@@ -14,6 +14,7 @@ use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Group;
@@ -44,7 +45,7 @@ class TasksRelationManager extends RelationManager
                 ->label(trans('server/schedule.tasks.actions.title'))
                 ->required()
                 ->live()
-                ->disableOptionWhen(fn (string $value) => !$tasks[$value]->canCreate($schedule))
+                ->disableOptionWhen(fn (string $value) => !$tasks[$value]->canCreate($schedule, user()))
                 ->options($taskService->getMappings())
                 ->selectablePlaceholder(false)
                 ->default(array_key_first($tasks))
@@ -61,6 +62,28 @@ class TasksRelationManager extends RelationManager
             Toggle::make('continue_on_failure')
                 ->label(trans('server/schedule.tasks.continue_on_failure')),
         ];
+    }
+
+    /**
+     * Stops the action and notifies the user if they are not allowed to save a task with the given action and payload.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function authorizeTask(Action $action, Schedule $schedule, array $data): void
+    {
+        /** @var TaskService $taskService */
+        $taskService = app(TaskService::class); // @phpstan-ignore myCustomRules.forbiddenGlobalFunctions
+
+        if ($taskService->get($data['action'] ?? '')?->canCreate($schedule, user(), $data['payload'] ?? null)) {
+            return;
+        }
+
+        Notification::make()
+            ->title(trans('server/schedule.tasks.no_permission'))
+            ->danger()
+            ->send();
+
+        $action->halt();
     }
 
     /**
@@ -88,7 +111,8 @@ class TasksRelationManager extends RelationManager
                 TextColumn::make('time_offset')
                     ->label(trans('server/schedule.tasks.time_offset'))
                     ->hidden(fn () => config('queue.default') === 'sync')
-                    ->state(fn (Task $task) => $task->isFirst() ? null : $task->time_offset)
+                    ->state(fn (Task $task) => $task->id === once(fn () => $schedule->firstTask()?->id) ? null : $task->time_offset)
+
                     ->suffix(fn ($state) => ' ' . trans_choice('server/schedule.tasks.seconds', $state))
                     ->placeholder(trans('server/schedule.tasks.first_task')),
                 IconColumn::make('continue_on_failure')
@@ -99,6 +123,7 @@ class TasksRelationManager extends RelationManager
             ->recordActions([
                 EditAction::make()
                     ->schema($this->getTaskForm($schedule))
+                    ->before(fn (array $data, EditAction $action) => $this->authorizeTask($action, $schedule, $data))
                     ->mutateDataUsing(function ($data) {
                         $data['payload'] ??= '';
 
@@ -132,7 +157,9 @@ class TasksRelationManager extends RelationManager
                     ->label(fn () => $schedule->tasks()->count() >= config('panel.client_features.schedules.per_schedule_task_limit', 10) ? trans('server/schedule.tasks.limit') : trans('server/schedule.tasks.create'))
                     ->disabled(fn () => $schedule->tasks()->count() >= config('panel.client_features.schedules.per_schedule_task_limit', 10))
                     ->schema($this->getTaskForm($schedule))
-                    ->action(function ($data) use ($schedule) {
+                    ->action(function ($data, CreateAction $action) use ($schedule) {
+                        $this->authorizeTask($action, $schedule, $data);
+
                         $sequenceId = ($schedule->tasks()->orderByDesc('sequence_id')->first()->sequence_id ?? 0) + 1;
 
                         $task = Task::query()->create([

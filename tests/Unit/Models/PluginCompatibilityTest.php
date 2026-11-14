@@ -19,6 +19,22 @@ class PluginCompatibilityTest extends TestCase
         $this->assertSame($expected, $plugin->isCompatible());
     }
 
+    #[DataProvider('compatibilityDataProvider')]
+    public function test_is_compatible_with_given_version(?string $constraint, string $panelVersion, bool $expected): void
+    {
+        if ($panelVersion === 'canary') {
+            $this->markTestSkipped('Update targets are always releases.');
+        }
+
+        // Compatibility with an update target must not depend on the running version.
+        config()->set('app.version', '9.9.9');
+
+        $plugin = new Plugin();
+        $plugin->panel_version = $constraint;
+
+        $this->assertSame($expected, $plugin->isCompatible($panelVersion));
+    }
+
     public static function compatibilityDataProvider(): array
     {
         return [
@@ -39,6 +55,9 @@ class PluginCompatibilityTest extends TestCase
             'caret prerelease below minimum' => ['^1.0', '1.0.0-rc1', false],
             'caret full constraint newer patch' => ['^1.2.3', '1.2.4', true],
             'caret full constraint below patch' => ['^1.2.3', '1.2.2', false],
+            'caret dotted prerelease below minimum' => ['^1.0.0-rc.3', '1.0.0-rc.2', false],
+            'caret dotted prerelease exact' => ['^1.0.0-rc.3', '1.0.0-rc.3', true],
+            'caret dotted prerelease allows stable' => ['^1.0.0-rc.3', '1.0.0', true],
         ];
     }
 }
