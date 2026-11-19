@@ -13,6 +13,7 @@ use App\Filament\Admin\Resources\Servers\Pages\EditServer;
 use App\Filament\Admin\Resources\Servers\Pages\ListServers;
 use App\Filament\Admin\Resources\Servers\Pages\ViewServer;
 use App\Filament\Admin\Resources\Servers\RelationManagers\AllocationsRelationManager;
+use App\Filament\Admin\Resources\Servers\RelationManagers\BackupsRelationManager;
 use App\Filament\Admin\Resources\Servers\RelationManagers\DatabasesRelationManager;
 use App\Filament\Components\Actions\DeleteIcon;
 use App\Filament\Components\Actions\PreviewStartupAction;
@@ -141,6 +142,7 @@ class ServerResource extends Resource
         return [
             AllocationsRelationManager::class,
             DatabasesRelationManager::class,
+            BackupsRelationManager::class,
         ];
     }
 
@@ -245,6 +247,8 @@ class ServerResource extends Resource
                                 ->icons(fn (Server $server) => [$server->condition->value => $server->condition->getIcon()])
                                 ->stateCast(new ServerConditionStateCast())
                                 ->dehydrated(false)
+                                ->required()
+                                ->markAsRequired(false)
                                 ->columnSpan([
                                     'default' => 2,
                                     'sm' => 1,
@@ -353,6 +357,7 @@ class ServerResource extends Resource
                                         ->afterStateUpdated(fn (Set $set) => $set('cpu', 0))
                                         ->formatStateUsing(fn (Get $get) => $get('cpu') == 0)
                                         ->live()
+                                        ->required()
                                         ->stateCast(new BooleanStateCast(false, true))
                                         ->options([
                                             1 => trans('admin/server.unlimited'),
@@ -385,6 +390,7 @@ class ServerResource extends Resource
                                         ->afterStateUpdated(fn (Set $set) => $set('memory', 0))
                                         ->formatStateUsing(fn (Get $get) => $get('memory') == 0)
                                         ->live()
+                                        ->required()
                                         ->stateCast(new BooleanStateCast(false, true))
                                         ->options([
                                             1 => trans('admin/server.unlimited'),
@@ -416,6 +422,7 @@ class ServerResource extends Resource
                                         ->dehydrated()
                                         ->label(trans('admin/server.disk'))->inlineLabel()->inline()
                                         ->live()
+                                        ->required()
                                         ->afterStateUpdated(fn (Set $set) => $set('disk', 0))
                                         ->formatStateUsing(fn (Get $get) => $get('disk') == 0)
                                         ->stateCast(new BooleanStateCast(false, true))
@@ -464,6 +471,7 @@ class ServerResource extends Resource
                                                 ->afterStateUpdated(fn (Set $set) => $set('threads', []))
                                                 ->formatStateUsing(fn (Get $get) => filled($get('threads')))
                                                 ->live()
+                                                ->required()
                                                 ->stateCast(new BooleanStateCast(false, true))
                                                 ->options([
                                                     0 => trans('admin/server.disabled'),
@@ -489,6 +497,7 @@ class ServerResource extends Resource
                                         ->live()
                                         ->label(trans('admin/server.swap'))->inlineLabel()->inline()
                                         ->columnSpan(2)
+                                        ->required()
                                         ->afterStateUpdated(function ($state, Set $set) {
                                             $value = match ($state) {
                                                 'unlimited' => -1,
@@ -547,6 +556,7 @@ class ServerResource extends Resource
                                         ->inlineLabel()
                                         ->inline()
                                         ->columnSpan(2)
+                                        ->required()
                                         ->stateCast(new BooleanStateCast(false, true))
                                         ->options([
                                             0 => trans('admin/server.disabled'),

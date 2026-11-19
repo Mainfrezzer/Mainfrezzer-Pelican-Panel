@@ -2,6 +2,7 @@
 
 namespace App\Filament\Server\Resources\Webhooks\Pages;
 
+use App\Enums\TablerIcon;
 use App\Enums\WebhookScope;
 use App\Filament\Server\Resources\Webhooks\WebhookResource;
 use App\Models\Server;
@@ -27,8 +28,12 @@ class CreateWebhook extends CreateRecord
     protected function getDefaultHeaderActions(): array
     {
         return [
-            $this->getCancelFormAction()->formId('form')->icon('tabler-cancel'),
-            $this->getCreateFormAction()->formId('form')->icon('tabler-plus'),
+            Action::make('create')
+                ->hiddenLabel()
+                ->action('create')
+                ->keyBindings(['mod+s'])
+                ->tooltip(trans('filament-panels::resources/pages/create-record.form.actions.create.label'))
+                ->icon(TablerIcon::FilePlus),
         ];
     }
 
@@ -51,6 +56,11 @@ class CreateWebhook extends CreateRecord
     protected function getRedirectUrl(): string
     {
         return EditWebhook::getUrl(['record' => $this->getRecord()]);
+    }
+
+    public function getBreadcrumbs(): array
+    {
+        return [];
     }
 
     public function mount(): void

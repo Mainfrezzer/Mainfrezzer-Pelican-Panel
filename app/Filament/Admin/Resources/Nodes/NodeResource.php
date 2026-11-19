@@ -10,6 +10,7 @@ use App\Filament\Admin\Resources\Nodes\Pages\EditNode;
 use App\Filament\Admin\Resources\Nodes\Pages\ListNodes;
 use App\Filament\Admin\Resources\Nodes\Pages\ViewNode;
 use App\Filament\Admin\Resources\Nodes\RelationManagers\AllocationsRelationManager;
+use App\Filament\Admin\Resources\Nodes\RelationManagers\BackupsRelationManager;
 use App\Filament\Admin\Resources\Nodes\RelationManagers\ServersRelationManager;
 use App\Filament\Admin\Resources\Nodes\RelationManagers\ServerTransferBatchesRelationManager;
 use App\Models\Node;
@@ -100,6 +101,7 @@ class NodeResource extends Resource
         return [
             AllocationsRelationManager::class,
             ServersRelationManager::class,
+            BackupsRelationManager::class,
             ServerTransferBatchesRelationManager::class,
         ];
     }
@@ -292,6 +294,7 @@ class NodeResource extends Resource
                     ToggleButtons::make('connection')
                         ->label(trans('admin/node.ssl'))
                         ->columnSpan(2)
+                        ->required()
                         ->inline()
                         ->helperText(function () {
                             if (request()->isSecure()) {
@@ -425,6 +428,7 @@ class NodeResource extends Resource
                         ])
                         ->label(trans('admin/node.use_for_deploy'))
                         ->inline()
+                        ->required()
                         ->stateCast(new BooleanStateCast(false, true))
                         ->options([
                             1 => trans('admin/node.yes'),
@@ -443,6 +447,7 @@ class NodeResource extends Resource
                         ])
                         ->label(trans('admin/node.maintenance_mode'))
                         ->inline()
+                        ->required()
                         ->hintIcon(TablerIcon::QuestionMark, trans('admin/node.maintenance_mode_help'))
                         ->stateCast(new BooleanStateCast(false, true))
                         ->options([
@@ -469,6 +474,7 @@ class NodeResource extends Resource
                                 ->afterStateUpdated(fn (Set $set) => $set('memory_overallocate', 0))
                                 ->formatStateUsing(fn (Get $get) => $get('memory') == 0)
                                 ->live()
+                                ->required()
                                 ->stateCast(new BooleanStateCast(false, true))
                                 ->options([
                                     1 => trans('admin/node.unlimited'),
@@ -527,6 +533,7 @@ class NodeResource extends Resource
                                 ->dehydrated()
                                 ->label(trans('admin/node.disk'))->inlineLabel()->inline()
                                 ->live()
+                                ->required()
                                 ->afterStateUpdated(fn (Set $set) => $set('disk', 0))
                                 ->afterStateUpdated(fn (Set $set) => $set('disk_overallocate', 0))
                                 ->formatStateUsing(fn (Get $get) => $get('disk') == 0)
@@ -583,6 +590,7 @@ class NodeResource extends Resource
                                 ->dehydrated()
                                 ->label(trans('admin/node.cpu'))->inlineLabel()->inline()
                                 ->live()
+                                ->required()
                                 ->afterStateUpdated(fn (Set $set) => $set('cpu', 0))
                                 ->afterStateUpdated(fn (Set $set) => $set('cpu_overallocate', 0))
                                 ->formatStateUsing(fn (Get $get) => $get('cpu') == 0)
@@ -703,10 +711,6 @@ class NodeResource extends Resource
                                 ->columnSpanFull()
                                 ->columns(['default' => 1, 'md' => 3])
                                 ->schema([
-                                    TextInput::make('daemon_config.system.username')
-                                        ->label(trans('admin/node.wings_config.fields.system_username'))
-                                        ->hintIcon(TablerIcon::QuestionMark, trans('admin/node.wings_config.field_help.system_username'))
-                                        ->placeholder('pelican'),
                                     TextInput::make('daemon_config.system.timezone')
                                         ->label(trans('admin/node.wings_config.fields.system_timezone'))
                                         ->hintIcon(TablerIcon::QuestionMark, trans('admin/node.wings_config.field_help.system_timezone'))
@@ -717,14 +721,6 @@ class NodeResource extends Resource
                                     Select::make('daemon_config.system.quotas.enabled')
                                         ->label(trans('admin/node.wings_config.fields.system_quotas_enabled'))
                                         ->hintIcon(TablerIcon::QuestionMark, trans('admin/node.wings_config.field_help.system_quotas_enabled'))
-                                        ->options([
-                                            1 => trans('admin/node.enabled'),
-                                            0 => trans('admin/node.disabled'),
-                                        ])
-                                        ->placeholder(trans('admin/node.wings_config.default', ['value' => trans('admin/node.disabled')])),
-                                    Select::make('daemon_config.system.user.rootless.enabled')
-                                        ->label(trans('admin/node.wings_config.fields.system_user_rootless_enabled'))
-                                        ->hintIcon(TablerIcon::QuestionMark, trans('admin/node.wings_config.field_help.system_user_rootless_enabled'))
                                         ->options([
                                             1 => trans('admin/node.enabled'),
                                             0 => trans('admin/node.disabled'),
@@ -816,9 +812,6 @@ class NodeResource extends Resource
                                         ->minValue(0)
                                         ->placeholder('100')
                                         ->suffix(config('panel.use_binary_prefix') ? 'MiB' : 'MB'),
-                                    TextInput::make('daemon_config.docker.userns_mode')
-                                        ->label(trans('admin/node.wings_config.fields.docker_userns_mode'))
-                                        ->hintIcon(TablerIcon::QuestionMark, trans('admin/node.wings_config.field_help.docker_userns_mode')),
                                     TextInput::make('daemon_config.docker.installer_limits.memory')
                                         ->label(trans('admin/node.wings_config.fields.docker_installer_limits_memory'))
                                         ->hintIcon(TablerIcon::QuestionMark, trans('admin/node.wings_config.field_help.docker_installer_limits_memory'))
@@ -1100,10 +1093,12 @@ class NodeResource extends Resource
                                 ->hintIcon(TablerIcon::QuestionMark)->inline()
                                 ->hintIconTooltip(trans('admin/node.diagnostics.include_endpoints_hint'))
                                 ->formatStateUsing(fn () => 1)
+                                ->required()
                                 ->boolean(),
                             ToggleButtons::make('include_logs')
                                 ->label(trans('admin/node.diagnostics.include_logs'))
                                 ->live()
+                                ->required()
                                 ->hintIcon(TablerIcon::QuestionMark)->inline()
                                 ->hintIconTooltip(trans('admin/node.diagnostics.include_logs_hint'))
                                 ->formatStateUsing(fn () => 1)
